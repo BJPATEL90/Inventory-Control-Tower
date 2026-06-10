@@ -5,7 +5,19 @@
 
 let _overviewCharts = {};
 
+// Destroy all existing chart instances before re-rendering
+function _destroyAllCharts() {
+  Object.values(_overviewCharts).forEach(c => { try { c.destroy(); } catch(e) {} });
+  _overviewCharts = {};
+  // Also destroy any Chart.js instances attached to canvases globally
+  document.querySelectorAll('canvas').forEach(canvas => {
+    const existing = Chart.getChart(canvas);
+    if (existing) existing.destroy();
+  });
+}
+
 async function loadOverview(container) {
+  _destroyAllCharts();
   container.innerHTML = `
     <div class="page-header">
       <div>
@@ -73,8 +85,7 @@ async function _fetchAndRenderOverview() {
 
 window.refreshOverview = function() {
   clearApiCache();
-  Object.values(_overviewCharts).forEach(c => c.destroy?.());
-  _overviewCharts = {};
+  _destroyAllCharts();
   _fetchAndRenderOverview();
 };
 
