@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inventory Control Tower</title>
+  <meta name="description" content="Enterprise inventory monitoring — real-time DOI, expiry, warehouse utilization.">
+
+  <!-- Google Sign-In -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/styles.css">
+
+  <style>
+    /* Inline critical styles to prevent flash */
+    body { background: #0d1117; }
+    [data-theme="light"] body { background: #f6f8fa; }
+  </style>
+</head>
+<body>
+
+<!-- ── AUTH OVERLAY ─────────────────────────────────────────────────────────── -->
+<div id="auth-overlay" style="display:none;">
+  <div class="auth-card">
+    <div class="auth-logo">🏭</div>
+    <h2>Inventory Control Tower</h2>
+    <p>Sign in with your company Google account to access the dashboard.</p>
+
+    <!-- Google Sign-In Button (rendered by GSI library) -->
+    <div id="g_id_onload"
+         data-client_id="YOUR_OAUTH_CLIENT_ID"
+         data-callback="handleGoogleSignIn"
+         data-auto_prompt="true"
+         data-context="signin">
+    </div>
+    <div class="g_id_signin"
+         data-type="standard"
+         data-size="large"
+         data-theme="filled_blue"
+         data-text="sign_in_with"
+         data-shape="rectangular"
+         data-logo_alignment="left"
+         data-width="280">
+    </div>
+
+    <div id="auth-error"></div>
+  </div>
+</div>
+
+<!-- ── APP SHELL ────────────────────────────────────────────────────────────── -->
+<div id="app">
+
+  <!-- TOP BAR -->
+  <header class="top-bar">
+    <!-- Mobile hamburger -->
+    <button class="icon-btn" id="mobile-menu-btn" aria-label="Menu" style="display:none;">☰</button>
+
+    <!-- Brand -->
+    <div class="top-bar-brand">
+      <span class="brand-icon">🏭</span>
+      <div>
+        <div>Inventory Control Tower</div>
+        <div class="brand-sub">Supply Chain Intelligence</div>
+      </div>
+    </div>
+
+    <div class="top-bar-divider"></div>
+
+    <!-- Run status -->
+    <div class="run-badge">
+      <div class="pulse"></div>
+      <span id="run-date-label">Live</span>
+    </div>
+
+    <!-- Global loader indicator -->
+    <div id="global-loader" style="
+      width:18px;height:18px;border:2px solid var(--border);
+      border-top-color:var(--amber);border-radius:50%;
+      animation:spin 0.8s linear infinite;
+      opacity:0;transition:opacity 0.2s;flex-shrink:0;">
+    </div>
+
+    <div class="top-bar-spacer"></div>
+
+    <!-- Controls -->
+    <div class="top-bar-controls">
+      <button class="icon-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">☀️</button>
+      <div class="user-chip">
+        <div class="avatar" id="user-avatar">?</div>
+        <span id="user-chip-name">Loading...</span>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="signOut()" title="Sign out">↩</button>
+    </div>
+  </header>
+
+  <!-- MAIN LAYOUT -->
+  <div class="main-layout">
+
+    <!-- LEFT NAV RAIL -->
+    <nav class="nav-rail" aria-label="Main navigation">
+
+      <div class="nav-section-label">Dashboard</div>
+
+      <div class="nav-item active" data-module="overview" role="button" tabindex="0">
+        <span class="nav-icon">📊</span>
+        <span>Overview</span>
+      </div>
+
+      <div class="nav-section-label">Inventory</div>
+
+      <div class="nav-item" data-module="health" role="button" tabindex="0">
+        <span class="nav-icon">🏥</span>
+        <span>Inventory Health</span>
+        <span class="nav-badge" id="nav-badge-health" style="display:none;">0</span>
+      </div>
+
+      <div class="nav-item" data-module="expiry" role="button" tabindex="0">
+        <span class="nav-icon">⏳</span>
+        <span>Expiry Management</span>
+      </div>
+
+      <div class="nav-item" data-module="sku" role="button" tabindex="0">
+        <span class="nav-icon">🔍</span>
+        <span>SKU Deep Dive</span>
+      </div>
+
+      <div class="nav-section-label">Warehouse</div>
+
+      <div class="nav-item" data-module="utilization" role="button" tabindex="0">
+        <span class="nav-icon">🏭</span>
+        <span>Utilization</span>
+      </div>
+
+      <div class="nav-item" data-module="mother-warehouse" role="button" tabindex="0">
+        <span class="nav-icon">🏗️</span>
+        <span>Mother Warehouse</span>
+      </div>
+
+      <div class="nav-section-label">Admin</div>
+
+      <div class="nav-item" data-module="settings" role="button" tabindex="0">
+        <span class="nav-icon">⚙️</span>
+        <span>Settings</span>
+      </div>
+
+    </nav>
+
+    <!-- CONTENT AREA -->
+    <main class="content-area" id="content-area" aria-live="polite">
+      <!-- Module content rendered here by JS -->
+      <div class="loading-state">
+        <div class="loading-spinner"></div>
+        <span class="loading-text">Loading dashboard...</span>
+      </div>
+    </main>
+
+  </div><!-- /main-layout -->
+
+</div><!-- /app -->
+
+<!-- TOAST CONTAINER -->
+<div id="toast-container" aria-live="assertive"></div>
+
+<!-- ── SCRIPTS ───────────────────────────────────────────────────────────────── -->
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/inventoryHealth.js"></script>
+<script src="js/modules.js"></script>
+
+<script>
+  // ── POST-LOAD INIT ────────────────────────────────────────────────────────
+  // Replace YOUR_OAUTH_CLIENT_ID in the g_id_onload div above with your
+  // actual OAuth 2.0 Client ID from Google Cloud Console.
+  //
+  // Google Cloud Console → APIs & Services → Credentials → Create OAuth 2.0 Client ID
+  // Application type: Web application
+  // Authorised JavaScript origins: https://YOUR-GITHUB-USERNAME.github.io
+  // Authorised redirect URIs: (leave blank for implicit flow)
+
+  // Mobile nav: show hamburger on small screens
+  if (window.innerWidth <= 900) {
+    document.getElementById('mobile-menu-btn').style.display = 'flex';
+  }
+  window.addEventListener('resize', () => {
+    const btn = document.getElementById('mobile-menu-btn');
+    if (btn) btn.style.display = window.innerWidth <= 900 ? 'flex' : 'none';
+  });
+
+  // Keyboard navigation for nav items
+  document.querySelectorAll('.nav-item[data-module]').forEach(item => {
+    item.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        navigateTo(item.dataset.module);
+      }
+    });
+  });
+
+  // Handle hash on load (deep linking)
+  window.addEventListener('load', () => {
+    const hash = window.location.hash.slice(1);
+    if (hash && MODULES && MODULES[hash] && document.getElementById('app').classList.contains('visible')) {
+      navigateTo(hash);
+    }
+  });
+</script>
+
+</body>
+</html>
