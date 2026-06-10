@@ -1,233 +1,420 @@
 // =============================================================================
-// api.js — Inventory Control Tower
-// Centralised API client. All fetch calls to the Apps Script web app go here.
-// Includes: response caching, retry logic, error normalisation.
+// app.js — Inventory Control Tower
+// App shell: routing, auth, theme, shared UI utilities.
 // =============================================================================
 
-const API_BASE    = 'https://script.google.com/macros/s/AKfycbwln6VAsw69746cxkUZCVD8-808nji_9F2jJgwYagzZorYLepONpVt2ZVsf_Ywnmq7Q/exec';
-const SESSION_KEY = 'ict_session';
-const CACHE_TTL   = 5 * 60 * 1000; // 5 minutes in-memory cache
-
-// In-memory cache: key → { data, timestamp }
-const _cache = new Map();
-
 // ---------------------------------------------------------------------------
-// CORE FETCH
+// APP INIT
 // ---------------------------------------------------------------------------
 
-/**
- * Makes a GET request to the Apps Script API.
- * Attaches session token, handles retries, normalises errors.
- *
- * @param {string} action           API action parameter
- * @param {Object} params           Additional query params
- * @param {Object} opts
- * @param {boolean} opts.cache      Use in-memory cache (default true)
- * @param {boolean} opts.showLoader Show global loading indicator (default true)
- * @returns {Promise<any>}          Resolved with res.data or throws Error
- */
-async function apiCall(action, params = {}, opts = {}) {
-  const { cache = true, showLoader = true } = opts;
-  const cacheKey = action + JSON.stringify(params);
+document.addEventListener('DOMContentLoaded', () => {
+  initTheme();
+  initAuth();
+});
 
-  // Cache hit
-  if (cache) {
-    const hit = _cache.get(cacheKey);
-    if (hit && Date.now() - hit.timestamp < CACHE_TTL) {
-      return hit.data;
-    }
-  }
-
-  if (showLoader) showGlobalLoader(true);
-
-  const url = _buildUrl(action, params);
-
-  let lastError;
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const res  = await fetch(url, { method: 'GET', redirect: 'follow' });
-      const json = await res.json();
-
-      if (!json.success) {
-        throw new Error(json.error?.message || 'API returned success:false');
-      }
-
-      if (cache) {
-        _cache.set(cacheKey, { data: json.data, timestamp: Date.now() });
-      }
-      if (showLoader) showGlobalLoader(false);
-      return json.data;
-
-    } catch (err) {
-      lastError = err;
-      if (attempt < 3) {
-        await _sleep(attempt * 800); // Back-off: 800ms, 1600ms
-      }
-    }
-  }
-
-  if (showLoader) showGlobalLoader(false);
-  console.error(`API Error [${action}]:`, lastError);
-  showToast(`Failed to load ${action}. ${lastError.message}`, 'error');
-  throw lastError;
-}
-
-/**
- * Builds the full URL with query params + session token.
- */
-function _buildUrl(action, params) {
+function initAuth() {
   const session = getSession();
-  const allParams = { action, ...params };
-  if (session) allParams.sessionToken = JSON.stringify(session);
-  return API_BASE + '?' + new URLSearchParams(allParams).toString();
+  if (session) {
+    _launchApp(session);
+    return;
+  }
+
+  // DEV BYPASS: set ?noauth=1 in URL to skip login during setup/testing
+  // REMOVE THIS before going live to real users
+  if (new URLSearchParams(window.location.search).get('noauth') === '1') {
+    const devSession = {
+      email: 'dev@local', name: 'Dev User',
+      domain: 'local', exp: Date.now() + 8 * 3600 * 1000, iat: Date.now(),
+    };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(devSession));
+    _launchApp(devSession);
+    return;
+  }
+
+  document.getElementById('auth-overlay').style.display = 'flex';
+}
+
+function _launchApp(session) {
+  document.getElementById('auth-overlay').style.display = 'none';
+  const app = document.getElementById('app');
+  app.classList.add('visible');
+
+  // Set user chip
+  const chip = document.getElementById('user-chip-name');
+  if (chip) chip.textContent = session.name || session.email;
+  const avatar = document.getElementById('user-avatar');
+  if (avatar) avatar.textContent = (session.name || session.email || 'U')[0].toUpperCase();
+
+  // Wire nav
+  initNav();
+
+  // Load default page
+  navigateTo('overview');
 }
 
 // ---------------------------------------------------------------------------
-// SPECIFIC API METHODS
+// GOOGLE SIGN-IN CALLBACK (called by GSI library)
 // ---------------------------------------------------------------------------
 
-const API = {
-  /** Dashboard KPIs + charts + trend */
-  getSummary() {
-    return apiCall('summary');
-  },
+window.handleGoogleSignIn = async function(response) {
+  const errEl = document.getElementById('auth-error');
+  errEl.style.display = 'none';
 
-  /** Inventory health buckets + SKU table */
-  getInventoryHealth(filters = {}, page = 1, pageSize = 200) {
-    return apiCall('inventory-health', { ...filters, page, pageSize }, { cache: false });
-  },
-
-  /** Expiry risk rows */
-  getExpiry(filters = {}, page = 1, pageSize = 200) {
-    return apiCall('expiry', { ...filters, page, pageSize }, { cache: false });
-  },
-
-  /** Bin utilization + heatmap */
-  getUtilization() {
-    return apiCall('utilization');
-  },
-
-  /** Full SKU deep-dive */
-  getSku(skuCode) {
-    return apiCall('sku', { skuCode }, { cache: false });
-  },
-
-  /** Mother warehouse control tower */
-  getMotherWarehouse() {
-    return apiCall('mother-warehouse');
-  },
-
-  /** Facility list for filter dropdowns */
-  getFacilities() {
-    return apiCall('facilities', {}, { cache: true });
-  },
-
-  /** Admin settings */
-  getSettings(token) {
-    return apiCall('settings', { token }, { cache: false });
-  },
-
-  /** Health check */
-  ping() {
-    return apiCall('ping', {}, { cache: false, showLoader: false });
-  },
+  // authenticateWithGoogle is synchronous in practice (just decodes JWT)
+  // but declared async so we keep await for safety
+  const result = await authenticateWithGoogle(response.credential);
+  if (result.success) {
+    _launchApp(result.session);
+  } else {
+    errEl.textContent = result.error || 'Sign-in failed. Contact your administrator.';
+    errEl.style.display = 'block';
+  }
 };
 
 // ---------------------------------------------------------------------------
-// AUTH
+// NAVIGATION / ROUTING
+// ---------------------------------------------------------------------------
+
+// MODULES is a function so loader references resolve lazily after all scripts load.
+// This avoids "X is not defined" when app.js parses before dashboard.js etc.
+function MODULES(key) {
+  const map = {
+    overview          : { label: 'Overview',           icon: '📊', loader: loadOverview },
+    health            : { label: 'Inventory Health',   icon: '🏥', loader: loadInventoryHealth },
+    expiry            : { label: 'Expiry Management',  icon: '⏳', loader: loadExpiry },
+    utilization       : { label: 'Warehouse',          icon: '🏭', loader: loadUtilization },
+    sku               : { label: 'SKU Deep Dive',      icon: '🔍', loader: loadSkuDeepDive },
+    'mother-warehouse': { label: 'Mother Warehouse',  icon: '🏗️', loader: loadMotherWarehouse },
+    settings          : { label: 'Settings',           icon: '⚙️', loader: loadSettings },
+  };
+  return key ? map[key] : map;
+}
+
+let _currentModule = null;
+
+function initNav() {
+  document.querySelectorAll('.nav-item[data-module]').forEach(item => {
+    item.addEventListener('click', () => {
+      navigateTo(item.dataset.module);
+      // Close mobile nav
+      document.querySelector('.nav-rail')?.classList.remove('open');
+    });
+  });
+
+  // Mobile hamburger
+  const hamburger = document.getElementById('mobile-menu-btn');
+  if (hamburger) {
+    hamburger.addEventListener('click', () => {
+      document.querySelector('.nav-rail')?.classList.toggle('open');
+    });
+  }
+}
+
+function navigateTo(moduleKey) {
+  const mod = MODULES(moduleKey);
+  if (!mod) return;
+  _currentModule = moduleKey;
+
+  // Update nav active state
+  document.querySelectorAll('.nav-item[data-module]').forEach(el => {
+    el.classList.toggle('active', el.dataset.module === moduleKey);
+  });
+
+  // Render module
+  const contentEl = document.getElementById('content-area');
+  contentEl.innerHTML = '';
+  mod.loader(contentEl);
+
+  // Update URL hash
+  window.location.hash = moduleKey;
+}
+
+// Handle back/forward
+window.addEventListener('hashchange', () => {
+  const hash = window.location.hash.slice(1);
+  if (hash && MODULES[hash]) navigateTo(hash);
+});
+
+// ---------------------------------------------------------------------------
+// THEME
+// ---------------------------------------------------------------------------
+
+function initTheme() {
+  const saved = localStorage.getItem('ict_theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+  updateThemeIcon(saved);
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'dark';
+  const next    = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('ict_theme', next);
+  updateThemeIcon(next);
+}
+
+function updateThemeIcon(theme) {
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+}
+
+// ---------------------------------------------------------------------------
+// SHARED FORMAT UTILITIES
+// ---------------------------------------------------------------------------
+
+function formatINR(val) {
+  const n = parseFloat(val) || 0;
+  if (n >= 10000000) return '₹' + (n / 10000000).toFixed(2) + ' Cr';
+  if (n >= 100000)   return '₹' + (n / 100000).toFixed(2) + ' L';
+  if (n >= 1000)     return '₹' + Math.round(n).toLocaleString('en-IN');
+  return '₹' + Math.round(n);
+}
+
+function formatNum(val) {
+  return (parseFloat(val) || 0).toLocaleString('en-IN');
+}
+
+function formatPct(val) {
+  return (parseFloat(val) || 0).toFixed(1) + '%';
+}
+
+function formatDOI(val) {
+  const n = parseFloat(val) || 0;
+  if (n >= 9999) return '∞';
+  return n.toFixed(1);
+}
+
+function formatDate(val) {
+  if (!val) return '—';
+  const d = new Date(val);
+  if (isNaN(d)) return String(val);
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function bucketBadge(bucket) {
+  const map = {
+    'OOS'      : 'badge-oos',
+    'Critical' : 'badge-critical',
+    'Risk'     : 'badge-risk',
+    'Healthy'  : 'badge-healthy',
+    'Overstock': 'badge-overstock',
+  };
+  const cls = map[bucket] || '';
+  return `<span class="badge ${cls}">${bucket}</span>`;
+}
+
+function expiryBadge(bucket) {
+  const map = {
+    'Expired'       : 'badge-expired',
+    'Critical Expiry': 'badge-critical',
+    'Near Expiry'   : 'badge-near',
+  };
+  const cls = map[bucket] || '';
+  return `<span class="badge ${cls}">${bucket}</span>`;
+}
+
+function facilityBadge(code, type) {
+  const cls = type === 'Mother Warehouse' ? 'badge-mother' : 'badge-node';
+  return `<span class="badge ${cls}">${code}</span>`;
+}
+
+// ---------------------------------------------------------------------------
+// TOAST NOTIFICATIONS
+// ---------------------------------------------------------------------------
+
+function showToast(message, type = 'info', durationMs = 3500) {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
+  toast.innerHTML = `<span>${icons[type] || ''}</span><span>${message}</span>`;
+  container.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, durationMs);
+}
+
+// ---------------------------------------------------------------------------
+// TABLE SORT
 // ---------------------------------------------------------------------------
 
 /**
- * Decodes the Google ID token client-side.
- * The GSI library has already verified the signature before calling our
- * callback, so decoding the payload here is safe for an internal dashboard.
- * This avoids a CORS-prone Apps Script round-trip entirely.
+ * Makes a <table> sortable by clicking headers.
+ * @param {HTMLTableElement} table
+ * @param {Array<{ key: string, type: 'str'|'num'|'date' }>} colDefs
+ * @param {Function} renderFn  Called with (sortedData) to re-render tbody
  */
-async function authenticateWithGoogle(idToken) {
-  try {
-    // JWT is three base64url segments separated by dots
-    const parts = idToken.split('.');
-    if (parts.length !== 3) throw new Error('Malformed ID token.');
-
-    // Decode the payload (second segment)
-    const base64  = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const padding = '='.repeat((4 - base64.length % 4) % 4);
-    const json    = JSON.parse(atob(base64 + padding));
-
-    const email  = json.email || '';
-    const name   = json.name  || json.given_name || email;
-
-    if (!email) throw new Error('No email found in token.');
-
-    // Build local session — 8-hour expiry
-    const session = {
-      email,
-      name,
-      domain : email.split('@')[1] || '',
-      exp    : Date.now() + 8 * 60 * 60 * 1000,
-      iat    : Date.now(),
-    };
-
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-    return { success: true, session };
-
-  } catch (e) {
-    return { success: false, error: 'Sign-in failed: ' + e.message };
-  }
-}
-
-function getSession() {
-  const raw = localStorage.getItem(SESSION_KEY);
-  if (!raw) return null;
-  try {
-    const s = JSON.parse(raw);
-    if (Date.now() > s.exp) { localStorage.removeItem(SESSION_KEY); return null; }
-    return s;
-  } catch { return null; }
-}
-
-function signOut() {
-  localStorage.removeItem(SESSION_KEY);
-  window.location.reload();
-}
-
-function requireAuth() {
-  const session = getSession();
-  if (!session) {
-    document.getElementById('auth-overlay').style.display = 'flex';
-    document.getElementById('app').classList.remove('visible');
-    return false;
-  }
-  return true;
+function makeSortable(table, colDefs, data, renderFn) {
+  let sortCol = null, sortDir = 1;
+  table.querySelectorAll('thead th').forEach((th, i) => {
+    if (!colDefs[i]) return;
+    th.style.cursor = 'pointer';
+    th.innerHTML += ' <span class="sort-icon">⇅</span>';
+    th.addEventListener('click', () => {
+      if (sortCol === i) sortDir *= -1;
+      else { sortCol = i; sortDir = 1; }
+      table.querySelectorAll('thead th').forEach(t => t.classList.remove('sorted'));
+      th.classList.add('sorted');
+      th.querySelector('.sort-icon').textContent = sortDir === 1 ? '↑' : '↓';
+      const sorted = [...data].sort((a, b) => {
+        const def = colDefs[i];
+        let va = a[def.key], vb = b[def.key];
+        if (def.type === 'num') { va = parseFloat(va) || 0; vb = parseFloat(vb) || 0; }
+        else if (def.type === 'date') { va = new Date(va); vb = new Date(vb); }
+        else { va = String(va || '').toLowerCase(); vb = String(vb || '').toLowerCase(); }
+        return va < vb ? -sortDir : va > vb ? sortDir : 0;
+      });
+      renderFn(sorted);
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------
-// CACHE MANAGEMENT
+// CSV / EXCEL EXPORT
 // ---------------------------------------------------------------------------
 
-/** Clears the in-memory cache (call after a manual refresh). */
-function clearApiCache() {
-  _cache.clear();
+/**
+ * Exports a 2D array to a CSV file download.
+ * @param {string[][]} rows   First row = headers
+ * @param {string} filename
+ */
+function exportCSV(rows, filename) {
+  const csv = rows.map(row =>
+    row.map(cell => {
+      const s = String(cell ?? '');
+      return s.includes(',') || s.includes('"') || s.includes('\n')
+        ? '"' + s.replace(/"/g, '""') + '"'
+        : s;
+    }).join(',')
+  ).join('\n');
+
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  _downloadBlob(blob, filename + '.csv');
+  showToast(`Exported ${rows.length - 1} rows to ${filename}.csv`, 'success');
 }
 
-/** Clears cache for a specific action. */
-function clearCacheFor(action) {
-  for (const key of _cache.keys()) {
-    if (key.startsWith(action)) _cache.delete(key);
-  }
+/**
+ * Converts table data to a simple Excel-compatible TSV.
+ */
+function exportExcel(rows, filename) {
+  const tsv = rows.map(row => row.map(c => String(c ?? '')).join('\t')).join('\n');
+  const blob = new Blob([tsv], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+  _downloadBlob(blob, filename + '.xls');
+  showToast(`Exported to ${filename}.xls`, 'success');
+}
+
+function _downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a   = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // ---------------------------------------------------------------------------
-// UTILITIES
+// PAGINATION HELPER
 // ---------------------------------------------------------------------------
 
-function _sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+/**
+ * Renders pagination controls into a container element.
+ * @param {HTMLElement} container
+ * @param {{ page, pageSize, totalCount, totalPages }} pagination
+ * @param {Function} onPageChange  Called with new page number
+ */
+function renderPagination(container, pagination, onPageChange) {
+  const { page, pageSize, totalCount, totalPages } = pagination;
+  const start = Math.min((page - 1) * pageSize + 1, totalCount);
+  const end   = Math.min(page * pageSize, totalCount);
+
+  container.innerHTML = `
+    <div class="pagination">
+      <span class="pagination-info">Showing ${formatNum(start)}–${formatNum(end)} of ${formatNum(totalCount)}</span>
+      <button class="page-btn" ${page <= 1 ? 'disabled' : ''} data-page="${page - 1}">‹</button>
+      ${_pageButtons(page, totalPages)}
+      <button class="page-btn" ${page >= totalPages ? 'disabled' : ''} data-page="${page + 1}">›</button>
+    </div>`;
+
+  container.querySelectorAll('.page-btn[data-page]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = parseInt(btn.dataset.page);
+      if (!isNaN(p) && p >= 1 && p <= totalPages) onPageChange(p);
+    });
+  });
 }
 
-// Global loader reference (set by app.js after DOM ready)
-let _loaderEl = null;
-function showGlobalLoader(visible) {
-  if (!_loaderEl) _loaderEl = document.getElementById('global-loader');
-  if (_loaderEl) _loaderEl.style.opacity = visible ? '1' : '0';
+function _pageButtons(current, total) {
+  const pages = [];
+  const range = new Set([1, total, current - 1, current, current + 1].filter(p => p >= 1 && p <= total));
+  let prev = null;
+  [...range].sort((a,b) => a-b).forEach(p => {
+    if (prev && p - prev > 1) pages.push('<span style="padding:0 4px;color:var(--text-muted)">…</span>');
+    pages.push(`<button class="page-btn ${p === current ? 'active' : ''}" data-page="${p}">${p}</button>`);
+    prev = p;
+  });
+  return pages.join('');
 }
+
+// ---------------------------------------------------------------------------
+// LOADING / EMPTY HELPERS
+// ---------------------------------------------------------------------------
+
+function renderLoading(container, message = 'Loading data...') {
+  container.innerHTML = `
+    <div class="loading-state">
+      <div class="loading-spinner"></div>
+      <span class="loading-text">${message}</span>
+    </div>`;
+}
+
+function renderEmpty(container, message = 'No data available.', icon = '📭') {
+  container.innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">${icon}</div>
+      <p>${message}</p>
+    </div>`;
+}
+
+function renderError(container, message) {
+  container.innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">⚠️</div>
+      <p style="color:var(--red)">${message}</p>
+      <button class="btn btn-secondary mt-16" onclick="navigateTo('${_currentModule}')">Retry</button>
+    </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// CHART.JS DEFAULT CONFIG
+// ---------------------------------------------------------------------------
+
+function applyChartDefaults() {
+  if (!window.Chart) return;
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  Chart.defaults.color           = isDark ? '#8b949e' : '#57606a';
+  Chart.defaults.borderColor     = isDark ? '#30363d' : '#d0d7de';
+  Chart.defaults.font.family     = "'Inter', sans-serif";
+  Chart.defaults.font.size       = 11;
+  Chart.defaults.plugins.legend.display = true;
+  Chart.defaults.plugins.tooltip.backgroundColor = isDark ? '#1c2128' : '#ffffff';
+  Chart.defaults.plugins.tooltip.titleColor       = isDark ? '#e6edf3' : '#1f2328';
+  Chart.defaults.plugins.tooltip.bodyColor        = isDark ? '#8b949e' : '#57606a';
+  Chart.defaults.plugins.tooltip.borderColor      = isDark ? '#30363d' : '#d0d7de';
+  Chart.defaults.plugins.tooltip.borderWidth      = 1;
+}
+
+// Apply defaults when theme changes
+const _themeObserver = new MutationObserver(applyChartDefaults);
+_themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+// Chart colour palette
+const CHART_COLORS = {
+  blue   : '#58a6ff',
+  green  : '#3fb950',
+  red    : '#f85149',
+  amber  : '#f0883e',
+  purple : '#bc8cff',
+  yellow : '#e3b341',
+  teal   : '#39d353',
+  pink   : '#ff79c6',
+};
+const CHART_PALETTE = Object.values(CHART_COLORS);
