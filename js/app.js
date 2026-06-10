@@ -47,16 +47,13 @@ window.handleGoogleSignIn = async function(response) {
   const errEl = document.getElementById('auth-error');
   errEl.style.display = 'none';
 
-  try {
-    const result = await authenticateWithGoogle(response.credential);
-    if (result.success) {
-      _launchApp(result.session);
-    } else {
-      errEl.textContent = result.error || 'Sign-in failed. Contact your administrator.';
-      errEl.style.display = 'block';
-    }
-  } catch (e) {
-    errEl.textContent = 'Network error during sign-in. Please try again.';
+  // authenticateWithGoogle is synchronous in practice (just decodes JWT)
+  // but declared async so we keep await for safety
+  const result = await authenticateWithGoogle(response.credential);
+  if (result.success) {
+    _launchApp(result.session);
+  } else {
+    errEl.textContent = result.error || 'Sign-in failed. Contact your administrator.';
     errEl.style.display = 'block';
   }
 };

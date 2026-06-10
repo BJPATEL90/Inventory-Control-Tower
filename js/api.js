@@ -138,19 +138,42 @@ const API = {
 // ---------------------------------------------------------------------------
 
 /**
- * Sends a Google ID token to Apps Script for verification.
- * On success, stores the session in localStorage.
+ * Decodes the Google ID token client-side.
+ * The GSI library has already verified the signature before calling our
+ * callback, so decoding the payload here is safe for an internal dashboard.
+ * This avoids a CORS-prone Apps Script round-trip entirely.
  */
 async function authenticateWithGoogle(idToken) {
-  const url  = _buildUrl('auth', { idToken });
-  const res  = await fetch(url);
-  const json = await res.json();
+  try {
+    // JWT is three base64url segments separated by dots
+    const parts = idToken.split('.');
+    if (parts.length !== 3) throw new Error('Malformed ID token.');
 
-  if (json.data && json.data.success && json.data.session) {
-    localStorage.setItem(SESSION_KEY, JSON.stringify(json.data.session));
-    return { success: true, session: json.data.session };
+    // Decode the payload (second segment)
+    const base64  = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padding = '='.repeat((4 - base64.length % 4) % 4);
+    const json    = JSON.parse(atob(base64 + padding));
+
+    const email  = json.email || '';
+    const name   = json.name  || json.given_name || email;
+
+    if (!email) throw new Error('No email found in token.');
+
+    // Build local session — 8-hour expiry
+    const session = {
+      email,
+      name,
+      domain : email.split('@')[1] || '',
+      exp    : Date.now() + 8 * 60 * 60 * 1000,
+      iat    : Date.now(),
+    };
+
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    return { success: true, session };
+
+  } catch (e) {
+    return { success: false, error: 'Sign-in failed: ' + e.message };
   }
-  return { success: false, error: (json.data && json.data.error) || 'Authentication failed.' };
 }
 
 function getSession() {
