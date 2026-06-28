@@ -1,0 +1,9 @@
+# Frontend files — served via GitHub Pages, NOT Apps Script
+index.html
+js/**
+css/**
+
+# Git and config
+.git/**
+README.md
+.claspignore
