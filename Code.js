@@ -22,20 +22,24 @@ function setupSpreadsheet() {
     _autoSaveSpreadsheetId(ss);
     _installTriggers();
     Logger.log('=== Setup Complete ===');
-    SpreadsheetApp.getUi().alert(
-      '✅ Setup Complete!\n\n' +
-      'All sheets created.\n' +
-      'Seed data written.\n' +
-      'Daily trigger installed at 09:30 AM IST.\n\n' +
+    Logger.log(
       'Next Steps:\n' +
       '1. Open tbl_settings and fill in email recipients, OAuth Client ID, dashboard URL.\n' +
-      '2. Upload tbl_bin_master CSV.\n' +
-      '3. Deploy Apps Script as a Web App (Execute as: Me, Access: Anyone with Google Account).\n' +
-      '4. Add the Web App URL to Config.gs → dashboard_api_base.'
+      '2. Fill Facility Category column in tbl_facility_mapping.\n' +
+      '3. Upload tbl_bin_master CSV.\n' +
+      '4. Deploy Apps Script as a Web App (Execute as: Me, Access: Anyone with Google Account).\n' +
+      '5. Add the Web App URL to Config.gs → API_BASE.'
     );
+    try {
+      SpreadsheetApp.getUi().alert(
+        '✅ Setup Complete!\n\nAll sheets created.\nSeed data written.\nDaily trigger installed.\n\n' +
+        'Next: fill tbl_settings → email_recipients, dashboard_url, oauth_client_id.\n' +
+        'Fill Facility Category in tbl_facility_mapping.'
+      );
+    } catch (_) { /* Running from editor — UI alert not available, check logs */ }
   } catch (e) {
     Logger.log('Setup error: ' + e.message);
-    SpreadsheetApp.getUi().alert('❌ Setup failed: ' + e.message);
+    try { SpreadsheetApp.getUi().alert('❌ Setup failed: ' + e.message); } catch (_) {}
   }
 }
 
