@@ -3,208 +3,301 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Inventory Control Tower</title>
-  <meta name="description" content="Enterprise inventory monitoring — real-time DOI, expiry, warehouse utilization.">
-
-  <!-- Google Sign-In -->
+  <title>Inventory Control Tower — Mosaic Wellness</title>
+  <meta name="description" content="Inventory Control Tower — Mosaic Wellness Supply Chain Intelligence">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-
-  <!-- Chart.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-
-  <!-- Styles -->
-  <link rel="stylesheet" href="css/styles.css?v=2">
-
-  <style>
-    /* Inline critical styles to prevent flash */
-    body { background: #0d1117; }
-    [data-theme="light"] body { background: #f6f8fa; }
-  </style>
+  <link rel="stylesheet" href="css/styles.css?v=4">
 </head>
 <body>
 
-<!-- ── AUTH OVERLAY ─────────────────────────────────────────────────────────── -->
-<div id="auth-overlay" style="display:none;">
-  <div class="auth-card">
-    <div class="auth-logo">🏭</div>
-    <h2>Inventory Control Tower</h2>
-    <p>Sign in with your company Google account to access the dashboard.</p>
+<!-- ══════════════════════════════════════════════════════
+     AUTH OVERLAY
+     ══════════════════════════════════════════════════════ -->
+<div id="auth-overlay">
 
-    <!-- Google Sign-In Button (rendered by GSI library) -->
-    <div id="g_id_onload"
-         data-client_id="1021762366002-qh3o0qda7ttiv77v9f17sp2d9lb9qs1c.apps.googleusercontent.com"
-         data-callback="handleGoogleSignIn"
-         data-auto_prompt="true"
-         data-context="signin">
-    </div>
-    <div class="g_id_signin"
-         data-type="standard"
-         data-size="large"
-         data-theme="filled_blue"
-         data-text="sign_in_with"
-         data-shape="rectangular"
-         data-logo_alignment="left"
-         data-width="280">
+  <!-- Animated background -->
+  <div class="auth-bg">
+    <div class="auth-bg-circle c1"></div>
+    <div class="auth-bg-circle c2"></div>
+    <div class="auth-bg-circle c3"></div>
+  </div>
+
+  <div class="auth-container">
+
+    <!-- Left panel — branding -->
+    <div class="auth-left">
+      <div class="auth-left-inner">
+        <!-- Logo -->
+        <div class="auth-logo-block">
+          <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" class="auth-icon-mark">
+            <rect width="64" height="64" rx="16" fill="rgba(255,255,255,0.08)"/>
+            <path d="M12 48 L12 18 L32 40 L52 18 L52 48" stroke="white" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="12" cy="48" r="5" fill="#5ba85a"/>
+            <circle cx="32" cy="40" r="5" fill="white"/>
+            <circle cx="52" cy="48" r="5" fill="#5ba85a"/>
+          </svg>
+          <div class="auth-brand-name">
+            <span class="auth-brand-mosaic">mosaic</span>
+            <span class="auth-brand-wellness">WELLNESS</span>
+          </div>
+        </div>
+
+        <div class="auth-headline">
+          <h1>Inventory Control Tower</h1>
+          <p>End-to-end supply chain visibility for Be Bodywise, Man Matters &amp; Little Joys</p>
+        </div>
+
+        <!-- Feature pills -->
+        <div class="auth-pills">
+          <div class="auth-pill">📊 Real-time DOI</div>
+          <div class="auth-pill">⏳ Expiry Tracking</div>
+          <div class="auth-pill">🏭 Bin Utilization</div>
+          <div class="auth-pill">📧 Daily Alerts</div>
+          <div class="auth-pill">🔍 SKU Deep Dive</div>
+          <div class="auth-pill">📦 Health Buckets</div>
+        </div>
+
+        <div class="auth-stats">
+          <div class="auth-stat">
+            <span class="auth-stat-value">3</span>
+            <span class="auth-stat-label">Brands</span>
+          </div>
+          <div class="auth-stat-divider"></div>
+          <div class="auth-stat">
+            <span class="auth-stat-value">73</span>
+            <span class="auth-stat-label">Facilities</span>
+          </div>
+          <div class="auth-stat-divider"></div>
+          <div class="auth-stat">
+            <span class="auth-stat-value">877</span>
+            <span class="auth-stat-label">Active SKUs</span>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div id="auth-error"></div>
+    <!-- Right panel — sign in card -->
+    <div class="auth-right">
+      <div class="auth-card">
+        <div class="auth-card-logo">
+          <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" width="48" height="48">
+            <rect width="48" height="48" rx="12" fill="#1a5f5a" opacity="0.12"/>
+            <path d="M9 36 L9 14 L24 30 L39 14 L39 36" stroke="#1a5f5a" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="9"  cy="36" r="3.5" fill="#5ba85a"/>
+            <circle cx="24" cy="30" r="3.5" fill="#1a5f5a"/>
+            <circle cx="39" cy="36" r="3.5" fill="#5ba85a"/>
+          </svg>
+        </div>
+
+        <h2 class="auth-card-title">Welcome back</h2>
+        <p class="auth-card-sub">Sign in with your Mosaic Wellness Google account</p>
+
+        <div class="auth-google-wrap">
+          <div id="g_id_onload"
+               data-client_id="1021762366002-qh3o0qda7ttiv77v9f17sp2d9lb9qs1c.apps.googleusercontent.com"
+               data-callback="handleGoogleSignIn"
+               data-auto_prompt="false">
+          </div>
+          <div class="g_id_signin"
+               data-type="standard"
+               data-size="large"
+               data-theme="outline"
+               data-text="sign_in_with"
+               data-shape="rectangular"
+               data-logo_alignment="left"
+               data-width="300">
+          </div>
+        </div>
+
+        <div id="auth-error" class="auth-error"></div>
+
+        <p class="auth-restricted">
+          🔒 Access restricted to authorised users only
+        </p>
+      </div>
+    </div>
+
   </div>
 </div>
 
-<!-- ── APP SHELL ────────────────────────────────────────────────────────────── -->
+<!-- ══════════════════════════════════════════════════════
+     APP SHELL
+     ══════════════════════════════════════════════════════ -->
 <div id="app">
 
   <!-- TOP BAR -->
-  <header class="top-bar">
-    <!-- Mobile hamburger -->
-    <button class="icon-btn" id="mobile-menu-btn" aria-label="Menu" style="display:none;">☰</button>
+  <header class="topbar">
 
-    <!-- Brand -->
-    <div class="top-bar-brand">
-      <span class="brand-icon">🏭</span>
-      <div>
-        <div>Inventory Control Tower</div>
-        <div class="brand-sub">Supply Chain Intelligence</div>
+    <div class="topbar-left">
+      <button class="hamburger" id="mobile-menu-btn" aria-label="Toggle menu">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20">
+          <path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+        </svg>
+      </button>
+
+      <div class="topbar-brand">
+        <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" width="28" height="28" class="topbar-logo">
+          <rect width="32" height="32" rx="7" fill="#1a5f5a" opacity="0.15"/>
+          <path d="M6 24 L6 10 L16 20 L26 10 L26 24" stroke="#1a5f5a" stroke-width="2.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="6"  cy="24" r="2.5" fill="#5ba85a"/>
+          <circle cx="16" cy="20" r="2.5" fill="#1a5f5a"/>
+          <circle cx="26" cy="24" r="2.5" fill="#5ba85a"/>
+        </svg>
+        <div>
+          <div class="topbar-title">Inventory Control Tower</div>
+          <div class="topbar-sub">Mosaic Wellness</div>
+        </div>
       </div>
     </div>
 
-    <div class="top-bar-divider"></div>
-
-    <!-- Run status -->
-    <div class="run-badge">
-      <div class="pulse"></div>
-      <span id="run-date-label">Live</span>
-    </div>
-
-    <!-- Global loader indicator -->
-    <div id="global-loader" style="
-      width:18px;height:18px;border:2px solid var(--border);
-      border-top-color:var(--amber);border-radius:50%;
-      animation:spin 0.8s linear infinite;
-      opacity:0;transition:opacity 0.2s;flex-shrink:0;">
-    </div>
-
-    <div class="top-bar-spacer"></div>
-
-    <!-- Controls -->
-    <div class="top-bar-controls">
-      <button class="icon-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">☀️</button>
-      <div class="user-chip">
-        <div class="avatar" id="user-avatar">?</div>
-        <span id="user-chip-name">Loading...</span>
+    <div class="topbar-center">
+      <div class="run-pill" id="run-badge">
+        <span class="run-dot"></span>
+        <span id="run-date-label">Live</span>
       </div>
-      <button class="btn btn-ghost btn-sm" onclick="signOut()" title="Sign out">↩</button>
+      <div class="topbar-loader-wrap">
+        <div class="topbar-loader" id="global-loader"></div>
+      </div>
     </div>
+
+    <div class="topbar-right">
+      <button class="topbar-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle dark/light">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" id="theme-icon">
+          <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>
+        </svg>
+      </button>
+      <div class="topbar-user-chip">
+        <div class="topbar-avatar" id="user-avatar">B</div>
+        <span id="user-chip-name" class="topbar-uname">Loading</span>
+      </div>
+      <button class="topbar-btn topbar-signout" onclick="signOut()" title="Sign out">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
+          <path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd"/>
+        </svg>
+      </button>
+    </div>
+
   </header>
 
-  <!-- MAIN LAYOUT -->
-  <div class="main-layout">
+  <!-- BODY -->
+  <div class="app-body">
 
-    <!-- LEFT NAV RAIL -->
-    <nav class="nav-rail" aria-label="Main navigation">
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <nav class="sidebar-nav">
 
-      <div class="nav-section-label">Dashboard</div>
+        <div class="nav-section">
+          <div class="nav-section-label">Dashboard</div>
+          <a class="nav-item active" data-module="overview" role="button" tabindex="0">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z"/>
+              <path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z"/>
+            </svg>
+            Overview
+          </a>
+        </div>
 
-      <div class="nav-item active" data-module="overview" role="button" tabindex="0">
-        <span class="nav-icon">📊</span>
-        <span>Overview</span>
+        <div class="nav-section">
+          <div class="nav-section-label">Inventory</div>
+          <a class="nav-item" data-module="health" role="button" tabindex="0">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/>
+            </svg>
+            Inventory Health
+            <span class="nav-badge red" id="nav-badge-health" style="display:none">0</span>
+          </a>
+          <a class="nav-item" data-module="expiry" role="button" tabindex="0">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+            </svg>
+            Expiry Management
+          </a>
+          <a class="nav-item" data-module="sku" role="button" tabindex="0">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M9 9a2 2 0 114 0 2 2 0 01-4 0z"/>
+              <path fill-rule="evenodd" d="M10 3a7 7 0 100 14A7 7 0 0010 3zm-7 7a7 7 0 1114 0 7 7 0 01-14 0z" clip-rule="evenodd"/>
+            </svg>
+            SKU Deep Dive
+          </a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-label">Warehouse</div>
+          <a class="nav-item" data-module="utilization" role="button" tabindex="0">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/>
+              <path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/>
+            </svg>
+            Utilization
+          </a>
+          <a class="nav-item" data-module="mother-warehouse" role="button" tabindex="0">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clip-rule="evenodd"/>
+            </svg>
+            Mother Warehouse
+          </a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-label">Admin</div>
+          <a class="nav-item" data-module="settings" role="button" tabindex="0">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/>
+            </svg>
+            Settings
+          </a>
+        </div>
+
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-ver">ICT v2.0 · June 2026</div>
       </div>
+    </aside>
 
-      <div class="nav-section-label">Inventory</div>
-
-      <div class="nav-item" data-module="health" role="button" tabindex="0">
-        <span class="nav-icon">🏥</span>
-        <span>Inventory Health</span>
-        <span class="nav-badge" id="nav-badge-health" style="display:none;">0</span>
-      </div>
-
-      <div class="nav-item" data-module="expiry" role="button" tabindex="0">
-        <span class="nav-icon">⏳</span>
-        <span>Expiry Management</span>
-      </div>
-
-      <div class="nav-item" data-module="sku" role="button" tabindex="0">
-        <span class="nav-icon">🔍</span>
-        <span>SKU Deep Dive</span>
-      </div>
-
-      <div class="nav-section-label">Warehouse</div>
-
-      <div class="nav-item" data-module="utilization" role="button" tabindex="0">
-        <span class="nav-icon">🏭</span>
-        <span>Utilization</span>
-      </div>
-
-      <div class="nav-item" data-module="mother-warehouse" role="button" tabindex="0">
-        <span class="nav-icon">🏗️</span>
-        <span>Mother Warehouse</span>
-      </div>
-
-      <div class="nav-section-label">Admin</div>
-
-      <div class="nav-item" data-module="settings" role="button" tabindex="0">
-        <span class="nav-icon">⚙️</span>
-        <span>Settings</span>
-      </div>
-
-    </nav>
-
-    <!-- CONTENT AREA -->
-    <main class="content-area" id="content-area" aria-live="polite">
-      <!-- Module content rendered here by JS -->
-      <div class="loading-state">
-        <div class="loading-spinner"></div>
-        <span class="loading-text">Loading dashboard...</span>
+    <!-- CONTENT -->
+    <main class="content" id="content-area">
+      <div class="content-loading">
+        <div class="spinner-lg"></div>
+        <p>Loading dashboard...</p>
       </div>
     </main>
 
-  </div><!-- /main-layout -->
+  </div>
+</div>
 
-</div><!-- /app -->
+<!-- TOASTS -->
+<div id="toast-container"></div>
 
-<!-- TOAST CONTAINER -->
-<div id="toast-container" aria-live="assertive"></div>
-
-<!-- ── SCRIPTS — load order: api → modules → app ────────────────────────────── -->
-<script src="js/api.js?v=2"></script>
-<script src="js/dashboard.js?v=2"></script>
-<script src="js/inventoryHealth.js?v=2"></script>
-<script src="js/modules.js?v=2"></script>
-<script src="js/app.js?v=2"></script>
+<!-- SCRIPTS -->
+<script src="js/api.js?v=4"></script>
+<script src="js/dashboard.js?v=4"></script>
+<script src="js/inventoryHealth.js?v=4"></script>
+<script src="js/modules.js?v=4"></script>
+<script src="js/app.js?v=4"></script>
 
 <script>
-  // ── POST-LOAD INIT ────────────────────────────────────────────────────────
-  // Replace YOUR_OAUTH_CLIENT_ID in the g_id_onload div above with your
-  // actual OAuth 2.0 Client ID from Google Cloud Console.
-  //
-  // Google Cloud Console → APIs & Services → Credentials → Create OAuth 2.0 Client ID
-  // Application type: Web application
-  // Authorised JavaScript origins: https://YOUR-GITHUB-USERNAME.github.io
-  // Authorised redirect URIs: (leave blank for implicit flow)
-
-  // Mobile nav: show hamburger on small screens
-  if (window.innerWidth <= 900) {
-    document.getElementById('mobile-menu-btn').style.display = 'flex';
-  }
-  window.addEventListener('resize', () => {
+  // Mobile sidebar toggle
+  document.getElementById('mobile-menu-btn').addEventListener('click', () => {
+    document.getElementById('sidebar').classList.toggle('open');
+  });
+  document.addEventListener('click', e => {
+    const sb  = document.getElementById('sidebar');
     const btn = document.getElementById('mobile-menu-btn');
-    if (btn) btn.style.display = window.innerWidth <= 900 ? 'flex' : 'none';
+    if (window.innerWidth <= 900 && sb.classList.contains('open')
+        && !sb.contains(e.target) && !btn.contains(e.target)) {
+      sb.classList.remove('open');
+    }
   });
-
-  // Keyboard navigation for nav items
-  document.querySelectorAll('.nav-item[data-module]').forEach(item => {
-    item.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        navigateTo(item.dataset.module);
-      }
-    });
-  });
-
-  // Handle hash on load (deep linking)
+  // Deep link via hash
   window.addEventListener('load', () => {
     const hash = window.location.hash.slice(1);
-    if (hash && MODULES(hash) && document.getElementById('app').classList.contains('visible')) {
+    if (hash && typeof MODULES === 'function' && MODULES(hash)
+        && document.getElementById('app').classList.contains('visible')) {
       navigateTo(hash);
     }
   });
