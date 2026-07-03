@@ -207,7 +207,7 @@ function _buildSummaryCharts(skuAggRows, skuRows) {
       fAgg.badValue  += badVal;
     }
 
-    if (facilityType === FACILITY_TYPE_MOTHER && value > 0) {
+    if (_isMotherwh(facilityType) && value > 0) {
       if (!byMother.has(facility)) byMother.set(facility, 0);
       byMother.set(facility, byMother.get(facility) + value);
     }
@@ -718,10 +718,10 @@ function apiGetMotherWarehouse() {
   const motherAgg = new Map(); // facilityCode → aggregated KPIs
 
   facilityMap.forEach((info, code) => {
-    if (String(info['Facility Type']).trim() !== FACILITY_TYPE_MOTHER) return;
+    if (!_isMotherwh(info['Facility_Type'] || info['Facility Type'])) return;
     motherAgg.set(code, {
       facilityCode    : code,
-      facilityName    : String(info['Facility Name'] || code),
+      facilityName    : String(info['Display_Name'] || info['Facility Name'] || code),
       soh             : 0,
       sit             : 0,
       inventoryValue  : 0,
@@ -834,10 +834,10 @@ function apiGetFacilities() {
       return a !== 'false' && a !== '0' && a !== 'no';
     })
     .map(r => ({
-      code    : r['Facility Code'],
-      name    : r['Facility Name'],
-      type    : r['Facility Type'],
-      category: r['Facility Category'] || '',
+      code    : r['Depot Name'],
+      name    : r['Display_Name'] || r['Depot Name'],
+      type    : r['Facility_Type'],
+      fType   : r['F_Type'] || '',
     }));
 }
 
@@ -863,11 +863,11 @@ function apiGetFacilitiesDetail(params) {
   const facilityMap = readSheetAsObjects(SHEETS.FACILITY_MAPPING);
   const facilityInfo = {};
   facilityMap.forEach(r => {
-    const code = String(r['Facility Code'] || '').trim();
+    const code = String(r['Depot Name'] || '').trim();
     if (code) facilityInfo[code] = {
-      name    : r['Facility Name']     || code,
-      type    : r['Facility Type']     || '',
-      category: r['Facility Category'] || '',
+      name : r['Display_Name'] || code,
+      type : r['Facility_Type'] || '',
+      fType: r['F_Type'] || '',
     };
   });
 
@@ -879,12 +879,12 @@ function apiGetFacilitiesDetail(params) {
     if (!code) return;
 
     if (!byFacility.has(code)) {
-      const info = facilityInfo[code] || { name: code, type: '', category: '' };
+      const info = facilityInfo[code] || { name: code, type: '', fType: '' };
       byFacility.set(code, {
         facilityCode    : code,
         facilityName    : info.name,
         facilityType    : info.type,
-        facilityCategory: info.category,
+        fType           : info.fType,
         totalSoh        : 0,
         totalValue      : 0,
         goodValue       : 0,

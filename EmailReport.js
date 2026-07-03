@@ -91,11 +91,14 @@ function _buildEmailPayload() {
   // SKU summary for top tables
   const skuRows = readSheetAsObjects(SHEETS.SKU_SUMMARY);
 
-  const top20OOS = _getTopSkus(skuRows, HEALTH_BUCKET.OOS, 20);
-  const top20Critical = _getTopSkus(skuRows, HEALTH_BUCKET.CRITICAL, 20);
-  const top20Overstock = _getTopSkus(skuRows, HEALTH_BUCKET.OVERSTOCK, 20);
+  // Filter to Mother WH facilities only (SL Ambient + SL Mother Hub = MW-Self)
+  const motherWhRows = skuRows.filter(r => _isMotherwh(r['Facility Type']));
 
-  // Near expiry from expiry summary
+  const top20OOS = _getTopSkus(motherWhRows, HEALTH_BUCKET.OOS, 20);
+  const top20Critical = _getTopSkus(motherWhRows, HEALTH_BUCKET.CRITICAL, 20);
+  const top20Overstock = _getTopSkus(motherWhRows, HEALTH_BUCKET.OVERSTOCK, 20);
+
+  // Near expiry from expiry summary — all facilities (Mother WH + others, per user requirement)
   const expiryRows = readSheetAsObjects(SHEETS.EXPIRY_SUMMARY);
   const top20NearExpiry = _getTopExpiry(expiryRows, 20);
 
@@ -243,7 +246,7 @@ function _buildEmailHtml(p) {
 
   <!-- HEADER -->
   <div class="header">
-    <h1>🏭 Inventory Control Tower</h1>
+    <h1>Inventory Control Tower</h1>
     <p class="date">${runDateStr} — Daily Management Summary</p>
     <p>Auto-generated · Do not reply</p>
   </div>
@@ -251,11 +254,11 @@ function _buildEmailHtml(p) {
   <!-- ALERTS -->
   ${kpis.cogsMissingSkuCount > 0 ? `
   <div class="alert warning">
-    ⚠️ <span><strong>${kpis.cogsMissingSkuCount} SKU(s)</strong> are missing from COGS Master and are valued using Cost Price fallback. Please update <strong>tbl_cogs_master</strong> for accurate valuation.</span>
+    <span><strong>WARNING:</strong> ${kpis.cogsMissingSkuCount} SKU(s) are missing from COGS Master and are valued using Cost Price fallback. Please update <strong>tbl_cogs_master</strong> for accurate valuation.</span>
   </div>` : ''}
   ${kpis.valueAtRisk > 0 ? `
   <div class="alert danger">
-    🚨 <span><strong>${_inr(kpis.valueAtRisk)}</strong> of inventory is at risk (bad stock + near expiry + expired). Immediate review recommended.</span>
+    <span><strong>ACTION REQUIRED:</strong> <strong>${_inr(kpis.valueAtRisk)}</strong> of inventory is at risk (bad stock + near expiry + expired). Immediate review recommended.</span>
   </div>` : ''}
 
   <!-- KPI CARDS ROW 1 — Inventory Value -->
@@ -336,31 +339,31 @@ function _buildEmailHtml(p) {
 
   <!-- TOP 20 OOS -->
   <div class="section">
-    <div class="section-header oos">🔴 Top 20 Out-of-Stock SKUs</div>
+    <div class="section-header oos">Top 20 Out-of-Stock SKUs &mdash; SL Ambient &amp; SL Mother Hub</div>
     ${_skuTable(top20OOS, 'oos')}
   </div>
 
   <!-- TOP 20 CRITICAL -->
   <div class="section">
-    <div class="section-header critical">🟠 Top 20 Critical SKUs (DOI &lt; 7 Days)</div>
+    <div class="section-header critical">Top 20 Critical SKUs (DOI &lt; 7 Days) &mdash; SL Ambient &amp; SL Mother Hub</div>
     ${_skuTable(top20Critical, 'critical')}
   </div>
 
   <!-- TOP 20 NEAR EXPIRY -->
   <div class="section">
-    <div class="section-header expiry">🟣 Top 20 Near Expiry Batches</div>
+    <div class="section-header expiry">Top 20 Near Expiry Batches</div>
     ${_expiryTable(top20NearExpiry)}
   </div>
 
   <!-- TOP 20 OVERSTOCK -->
   <div class="section">
-    <div class="section-header overstock">🟢 Top 20 Overstock SKUs (DOI &gt; 90 Days)</div>
+    <div class="section-header overstock">Top 20 Overstock SKUs (DOI &gt; 90 Days) &mdash; SL Ambient &amp; SL Mother Hub</div>
     ${_skuTable(top20Overstock, 'overstock')}
   </div>
 
   <!-- CTA -->
   <div class="cta-wrap">
-    <a href="${dashboardUrl}" class="cta-btn">📊 Open Full Dashboard</a>
+    <a href="${dashboardUrl}" class="cta-btn">Open Full Dashboard</a>
   </div>
 
   <!-- FOOTER -->
