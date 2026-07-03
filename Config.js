@@ -360,10 +360,10 @@ const INVENTORY_TYPE_GOOD = 'GOOD_INVENTORY';
 const INVENTORY_TYPE_BAD  = 'BAD_INVENTORY';
 const BATCH_STATUS_ACTIVE = 'Active';
 
-// Facility type detection — Facility_Type values starting with 'MW-' are Mother Warehouses.
-// All other active facilities are treated as distribution/sales points.
+// Facility type detection — only 'MW-Self' = Mother Warehouse (self-operated stock buffer).
+// MW-3PL, Darkstore, Self-B2B, and all other types = distribution/network facilities.
 function _isMotherwh(facilityType) {
-  return String(facilityType || '').trim().toUpperCase().startsWith('MW-');
+  return String(facilityType || '').trim() === 'MW-Self';
 }
 
 // The only facility eligible for bin utilisation tracking
