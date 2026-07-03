@@ -107,24 +107,18 @@ const COGS_COLUMNS = [
 // Configurable via Settings page. Never hardcode facility types.
 // ---------------------------------------------------------------------------
 const FACILITY_MAPPING_COLUMNS = [
-  'Facility Code',
-  'Facility Name',
-  'Facility Type',      // 'Mother Warehouse' | 'Sales Node' — drives DOI calculation logic
-  'Facility Category',  // Free-text label: Mother WH, 3PL, Darkstore, etc. — filled by admin
+  'Depot Name',         // Matches Depot Name column in FG report and Facility column in Shelf report
+  'Display_Name',       // Human-readable label shown in the dashboard
+  'Facility_Type',      // MW-3PL | MW-Self = Mother Warehouse; Darkstore | Self-B2B | etc. = Distribution
   'Is Active',          // TRUE / FALSE
 ];
 
 // Default seed data — will be written on first setup only.
-// Admin fills in Facility Category directly in the sheet after setup.
+// Add your actual facilities here or upload directly to tbl_facility_mapping.
 const DEFAULT_FACILITY_MAPPING = [
-  ['SL_MH',      'SL Mother Hub',    'Mother Warehouse', '', true],
-  ['SL_Ambient', 'SL Ambient',       'Mother Warehouse', '', true],
-  ['Aramex',     'Aramex',           'Mother Warehouse', '', true],
-  ['SL_MM',      'SL Mall of Mumbai','Sales Node',       '', true],
-  ['SL_LJ',      'SL Lower Juhu',    'Sales Node',       '', true],
-  ['SL_BW',      'SL Bandra West',   'Sales Node',       '', true],
-  ['SL_B2B',     'SL B2B',           'Sales Node',       '', true],
-  ['SL_OFF',     'SL Office',        'Sales Node',       '', true],
+  ['SL Mother Hub',  'SL Mother Hub',  'MW-Self', true],
+  ['SL Ambient',     'SL Ambient',     'MW-Self', true],
+  ['Aramex',         '3PL-Aramex',     'MW-3PL',  true],
 ];
 
 // ---------------------------------------------------------------------------
@@ -177,7 +171,9 @@ const SKU_AGG_COLUMNS = [
   'Product Name',
   'Brand',
   'Category',
-  'Total SOH',
+  'Mother WH SOH',       // SOH in Mother WHs only — used for DOI and health bucket
+  'Network SOH',         // SOH in all other (distribution) facilities
+  'Total SOH',           // Mother WH SOH + Network SOH
   'Total SIT',
   'Total Damaged',
   'Total Open Purchase',
@@ -185,8 +181,8 @@ const SKU_AGG_COLUMNS = [
   'Sales 7D',
   'DRR30',
   'DRR7',
-  'DOI30',
-  'DOI7',
+  'DOI30',               // Based on Mother WH SOH / DRR30
+  'DOI7',                // Based on Mother WH SOH / DRR7
   'COGS',
   'COGS Source',
   'Total Inventory Value',
@@ -222,16 +218,18 @@ const INVENTORY_HEALTH_COLUMNS = [
 // ---------------------------------------------------------------------------
 const EXPIRY_SUMMARY_COLUMNS = [
   'Run Date',
-  'SkuCode',
+  'SKU Code',
   'Product Name',
   'Facility Code',
+  'Facility Name',
+  'Facility Type',    // MW-3PL | MW-Self | Darkstore | etc. — used to split Mother WH vs Others
   'Batch Code',
   'Expiry Date',
   'Days To Expiry',
   'Qty',
   'COGS',
   'Inventory Value',
-  'Expiry Bucket',    // 'Expired' | 'Critical' | 'Near Expiry'
+  'Expiry Bucket',    // 'Expired' | 'Critical Expiry' | 'Near Expiry'
 ];
 
 // ---------------------------------------------------------------------------
@@ -362,11 +360,14 @@ const INVENTORY_TYPE_GOOD = 'GOOD_INVENTORY';
 const INVENTORY_TYPE_BAD  = 'BAD_INVENTORY';
 const BATCH_STATUS_ACTIVE = 'Active';
 
-const FACILITY_TYPE_MOTHER = 'Mother Warehouse';
-const FACILITY_TYPE_SALES  = 'Sales Node';
+// Facility type detection — Facility_Type values starting with 'MW-' are Mother Warehouses.
+// All other active facilities are treated as distribution/sales points.
+function _isMotherwh(facilityType) {
+  return String(facilityType || '').trim().toUpperCase().startsWith('MW-');
+}
 
 // The only facility eligible for bin utilisation tracking
-const BIN_UTILIZATION_FACILITY = 'SL_MH';
+const BIN_UTILIZATION_FACILITY = 'SL Mother Hub';
 
 // Health bucket labels (used as keys across all modules)
 const HEALTH_BUCKET = {

@@ -77,7 +77,7 @@ function runInventoryEngine() {
   // 8. Expiry summary (mapped facilities only)
   Logger.log('Computing expiry...');
   const expiryRows = _computeExpirySummary(shelfRows, cogsMap, fgRows,
-                                            runDate, today, thresholds, mappedCodes);
+                                            runDate, today, thresholds, mappedCodes, facilityMap);
   Logger.log(`Expiry rows: ${expiryRows.length}`);
 
   // 9. Bin utilization
@@ -106,7 +106,8 @@ function _loadCogsMap() {
   const rows = readSheetAsObjects(SHEETS.COGS_MASTER);
   const map  = new Map();
   rows.forEach(row => {
-    const sku = String(row['SkuCode'] || '').trim(); // header in COGS_COLUMNS is 'SkuCode' (no space)
+    // Support both 'SKU Code' (with space — actual sheet header) and 'SkuCode' (legacy)
+    const sku = String(row['SKU Code'] || row['SkuCode'] || '').trim();
     if (sku && sku !== 'EXAMPLE.SKU.001') map.set(sku, row);
   });
   return map;
@@ -118,12 +119,9 @@ function _loadFacilityMap() {
   rows.forEach(row => {
     const active = String(row['Is Active'] || 'true').toLowerCase();
     if (active === 'false' || active === '0' || active === 'no') return;
-    const code = String(row['Facility Code'] || '').trim();
+    // Key = Depot Name (matches both FG report 'Depot Name' and Shelf report 'Facility' column)
+    const code = String(row['Depot Name'] || row['Facility Code'] || '').trim();
     if (code) map.set(code, row);
-  });
-  // Guarantee mother warehouse classification
-  ['SL_MH', 'SL_Ambient', 'Aramex'].forEach(code => {
-    if (map.has(code)) map.get(code)['Facility Type'] = FACILITY_TYPE_MOTHER;
   });
   return map;
 }
@@ -131,7 +129,7 @@ function _loadFacilityMap() {
 function _getSalesNodeCodes(facilityMap) {
   const codes = [];
   facilityMap.forEach((row, code) => {
-    if (String(row['Facility Type'] || '').trim() === FACILITY_TYPE_SALES) codes.push(code);
+    if (!_isMotherwh(row['Facility_Type'] || row['Facility Type'])) codes.push(code);
   });
   return codes;
 }
@@ -139,7 +137,7 @@ function _getSalesNodeCodes(facilityMap) {
 function _getMotherWarehouseCodes(facilityMap) {
   const codes = [];
   facilityMap.forEach((row, code) => {
-    if (String(row['Facility Type'] || '').trim() === FACILITY_TYPE_MOTHER) codes.push(code);
+    if (_isMotherwh(row['Facility_Type'] || row['Facility Type'])) codes.push(code);
   });
   return codes;
 }
@@ -206,7 +204,8 @@ function _aggregateShelfData(shelfRows, today, mappedCodes, thresholds) {
   const map = new Map();
 
   shelfRows.forEach(row => {
-    const facilityCode = String(row['Facility Code'] || '').trim();
+    // Match shelf rows using 'Facility' (full name) — same as Depot Name in facility mapping
+    const facilityCode = String(row['Facility'] || row['Facility Code'] || '').trim();
     if (!mappedCodes.has(facilityCode)) return; // Skip unmapped
 
     const skuCode = String(row['Item Type SKU Code'] || '').trim();
@@ -291,8 +290,8 @@ function _aggregateShelfData(shelfRows, today, mappedCodes, thresholds) {
 function _computeCombinedSales(fgRows, salesNodeSet) {
   const map = new Map();
   fgRows.forEach(row => {
-    const depotCode = String(row['Depot Code'] || '').trim();
-    const skuCode   = String(row['SkuCode']    || '').trim();
+    const depotCode = String(row['Depot Name'] || '').trim();
+    const skuCode   = String(row['SKU Code'] || row['SkuCode'] || '').trim();
     if (!salesNodeSet.has(depotCode) || !skuCode) return;
     if (!map.has(skuCode)) map.set(skuCode, { sales30: 0, sales7: 0 });
     const e = map.get(skuCode);
@@ -314,8 +313,9 @@ function _buildSkuSummary(fgRows, shelfAgg, cogsMap, facilityMap, mappedCodes,
   const excludedFacilities = new Set();
 
   fgRows.forEach(fg => {
-    const depotCode = String(fg['Depot Code'] || '').trim();
-    const skuCode   = String(fg['SkuCode']    || '').trim();
+    // Match using Depot Name (full name) — this is what tbl_facility_mapping uses as key
+    const depotCode = String(fg['Depot Name'] || '').trim();
+    const skuCode   = String(fg['SKU Code'] || fg['SkuCode'] || '').trim();
     if (!depotCode || !skuCode) return;
 
     // Unmapped facility → track and skip
@@ -325,8 +325,8 @@ function _buildSkuSummary(fgRows, shelfAgg, cogsMap, facilityMap, mappedCodes,
     }
 
     const facilityInfo = facilityMap.get(depotCode);
-    const facilityType = String(facilityInfo['Facility Type'] || FACILITY_TYPE_SALES).trim();
-    const facilityName = String(facilityInfo['Facility Name'] || depotCode).trim();
+    const facilityType = String(facilityInfo['Facility_Type'] || facilityInfo['Facility Type'] || '').trim();
+    const facilityName = String(facilityInfo['Display_Name']  || facilityInfo['Facility Name'] || depotCode).trim();
 
     // Discontinued SKU check
     const isDiscontinued = !activeSKUs.has(skuCode);
@@ -340,7 +340,7 @@ function _buildSkuSummary(fgRows, shelfAgg, cogsMap, facilityMap, mappedCodes,
 
     // Sales: Mother WH uses combined sales node sales
     let sales30, sales7;
-    if (motherSet.has(depotCode)) {
+    if (_isMotherwh(facilityType)) {
       const c = combinedSales.get(skuCode) || { sales30: 0, sales7: 0 };
       sales30 = c.sales30; sales7 = c.sales7;
     } else {
@@ -481,6 +481,7 @@ function _computeSkuAggregates(skuRows, discontinuedRows, combinedSales, thresho
   const iExpV    = SKU_SUMMARY_COLUMNS.indexOf('Expired Value');
   const iRisk    = SKU_SUMMARY_COLUMNS.indexOf('Value At Risk');
   const iFac     = SKU_SUMMARY_COLUMNS.indexOf('Facility Code');
+  const iFacType = SKU_SUMMARY_COLUMNS.indexOf('Facility Type');
   const iDisc    = SKU_SUMMARY_COLUMNS.indexOf('Is Discontinued');
 
   const skuMap = new Map();
@@ -498,7 +499,9 @@ function _computeSkuAggregates(skuRows, discontinuedRows, combinedSales, thresho
         cogs   : row[iCogs],
         cogsS  : row[iCogsS],
         isDisc : row[iDisc],
-        totalSoh: 0, totalSit: 0, totalDmg: 0, totalPo: 0,
+        motherWhSoh: 0,           // SOH in Mother WHs only — drives DOI + health bucket
+        networkSoh : 0,           // SOH in distribution facilities
+        totalSit: 0, totalDmg: 0, totalPo: 0,
         totalInvV: 0, totalGoodV: 0, totalBadV: 0,
         totalGoodQ: 0, totalBadQ: 0,
         totalNearQ: 0, totalCritQ: 0, totalExpQ: 0,
@@ -510,7 +513,15 @@ function _computeSkuAggregates(skuRows, discontinuedRows, combinedSales, thresho
 
     const a   = skuMap.get(sku);
     const soh = safeNum(row[iSoh]);
-    a.totalSoh   += soh;
+    const facType = String(row[iFacType] || '').trim();
+
+    // Separate Mother WH stock from distribution/network stock
+    if (_isMotherwh(facType)) {
+      a.motherWhSoh += soh;
+    } else {
+      a.networkSoh  += soh;
+    }
+
     a.totalSit   += safeNum(row[iSit]);
     a.totalDmg   += safeNum(row[iDmg]);
     a.totalPo    += safeNum(row[iPo]);
@@ -535,21 +546,24 @@ function _computeSkuAggregates(skuRows, discontinuedRows, combinedSales, thresho
   const aggRows = [];
 
   skuMap.forEach(a => {
-    // DOI at SKU level: always use combined sales from sales nodes
+    // DOI uses Mother WH SOH only (how many days of stock left at the warehouse)
+    // DRR comes from combined sales across all sales/distribution channels
     const sales = combinedSales.get(a.sku) || { sales30: 0, sales7: 0 };
     const drr30 = sales.sales30 > 0 ? sales.sales30 / 30 : 0;
     const drr7  = sales.sales7  > 0 ? sales.sales7  / 7  : 0;
-    const doi30 = drr30 > 0 ? a.totalSoh / drr30 : (a.totalSoh > 0 ? 9999 : 0);
-    const doi7  = drr7  > 0 ? a.totalSoh / drr7  : (a.totalSoh > 0 ? 9999 : 0);
+    const doi30 = drr30 > 0 ? a.motherWhSoh / drr30 : (a.motherWhSoh > 0 ? 9999 : 0);
+    const doi7  = drr7  > 0 ? a.motherWhSoh / drr7  : (a.motherWhSoh > 0 ? 9999 : 0);
 
     const isDisc = a.isDisc === 'Yes';
+    // Health bucket based on Mother WH stock — OOS means no stock in any Mother WH
     const bucket = isDisc ? 'Discontinued'
-                 : _assignHealthBucket(a.totalSoh, doi30, thresholds);
+                 : _assignHealthBucket(a.motherWhSoh, doi30, thresholds);
 
     aggRows.push([
       runDate,
       a.sku, a.name, a.brand, a.cat,
-      a.totalSoh, a.totalSit, a.totalDmg, a.totalPo,
+      a.motherWhSoh, a.networkSoh, a.motherWhSoh + a.networkSoh,
+      a.totalSit, a.totalDmg, a.totalPo,
       sales.sales30, sales.sales7,
       drr30, drr7, doi30, doi7,
       a.cogs, a.cogsS,
@@ -592,7 +606,7 @@ function _assignHealthBucket(soh, doi30, t) {
 
 function _computeHealthBuckets(skuAggRows, runDate) {
   // SKU_AGG_COLUMNS indices — one row per SKU, so no Set deduplication needed
-  const iSOH    = SKU_AGG_COLUMNS.indexOf('Total SOH');
+  const iSOH    = SKU_AGG_COLUMNS.indexOf('Mother WH SOH'); // health is based on Mother WH stock
   const iValue  = SKU_AGG_COLUMNS.indexOf('Total Inventory Value');
   const iBucket = SKU_AGG_COLUMNS.indexOf('Health Bucket');
 
@@ -618,11 +632,11 @@ function _computeHealthBuckets(skuAggRows, runDate) {
 // EXPIRY SUMMARY (mapped facilities only)
 // ---------------------------------------------------------------------------
 
-function _computeExpirySummary(shelfRows, cogsMap, fgRows, runDate, today, thresholds, mappedCodes) {
-  // Build SKU → Product Name lookup
+function _computeExpirySummary(shelfRows, cogsMap, fgRows, runDate, today, thresholds, mappedCodes, facilityMap) {
+  // Build SKU → Product Name lookup (using Depot Name as key)
   const skuNameMap = new Map();
   fgRows.forEach(row => {
-    const sku  = String(row['SkuCode'] || '').trim();
+    const sku  = String(row['SKU Code'] || row['SkuCode'] || '').trim();
     const name = String(row['Product Name'] || '').trim();
     if (sku && name && !skuNameMap.has(sku)) skuNameMap.set(sku, name);
   });
@@ -632,7 +646,8 @@ function _computeExpirySummary(shelfRows, cogsMap, fgRows, runDate, today, thres
   const crit = thresholds.criticalExpiryDays;
 
   shelfRows.forEach(row => {
-    const facilityCode = String(row['Facility Code'] || '').trim();
+    // Match using Facility (full name) — same as Depot Name in facility mapping
+    const facilityCode = String(row['Facility'] || row['Facility Code'] || '').trim();
     if (!mappedCodes.has(facilityCode)) return;
 
     const skuCode    = String(row['Item Type SKU Code'] || '').trim();
@@ -652,11 +667,14 @@ function _computeExpirySummary(shelfRows, cogsMap, fgRows, runDate, today, thres
 
     const cogsRow = cogsMap.get(skuCode);
     const cogs    = cogsRow ? safeNum(cogsRow['COGS']) : 0;
+    const facInfo = facilityMap ? facilityMap.get(facilityCode) : null;
+    const facType = facInfo ? String(facInfo['Facility_Type'] || facInfo['Facility Type'] || '') : '';
+    const facDisplay = facInfo ? String(facInfo['Display_Name'] || facInfo['Facility Name'] || facilityCode) : facilityCode;
 
     outputRows.push([
       runDate, skuCode,
       skuNameMap.get(skuCode) || String(row['Item Type Name'] || ''),
-      facilityCode,
+      facilityCode, facDisplay, facType,
       String(row['Batch Code']   || ''),
       expiryDate, daysToExpiry, qty, cogs, qty * cogs,
       expiryBucket,
@@ -769,6 +787,7 @@ function _writeUtilization(data) {
 function _writeDashboardSummary(skuAggRows, discontinuedRows, healthRows, utilData,
                                   excludedFacilities, activeSKUs, runDate) {
   // Aggregate from SKU-level rows (one row per SKU — correct distinct counts)
+  const iMotherSoh = SKU_AGG_COLUMNS.indexOf('Mother WH SOH'); // eslint-disable-line no-unused-vars
   const iVal     = SKU_AGG_COLUMNS.indexOf('Total Inventory Value');
   const iGoodVal = SKU_AGG_COLUMNS.indexOf('Total Good Value');
   const iBadVal  = SKU_AGG_COLUMNS.indexOf('Total Bad Value');
