@@ -355,7 +355,7 @@ function _buildSkuSummary(fgRows, shelfAgg, cogsMap, facilityMap, mappedCodes,
     if (cogsRow && safeNum(cogsRow['COGS']) > 0) {
       cogs = safeNum(cogsRow['COGS']); cogsSource = COGS_SOURCE.MASTER;
     } else {
-      cogs = costPrice; cogsSource = COGS_SOURCE.FALLBACK;
+      cogs = costPrice > 0 ? costPrice : 10; cogsSource = COGS_SOURCE.FALLBACK;
     }
 
     // Brand normalisation
@@ -667,7 +667,7 @@ function _computeExpirySummary(shelfRows, cogsMap, fgRows, runDate, today, thres
     else                          expiryBucket = EXPIRY_BUCKET.NEAR;
 
     const cogsRow = cogsMap.get(skuCode);
-    const cogs    = cogsRow ? safeNum(cogsRow['COGS']) : 0;
+    const cogs    = cogsRow && safeNum(cogsRow['COGS']) > 0 ? safeNum(cogsRow['COGS']) : 10;
     const facInfo = facilityMap ? facilityMap.get(facilityCode) : null;
     const facType = facInfo ? String(facInfo['Facility_Type'] || facInfo['Facility Type'] || '') : '';
     const facDisplay = facInfo ? String(facInfo['Display_Name'] || facInfo['Facility Name'] || facilityCode) : facilityCode;
@@ -768,7 +768,7 @@ function _computeBadInventorySummary(shelfRows, cogsMap, facilityMap, mappedCode
     const key = `${facilityName}|${skuCode}`;
     if (!map.has(key)) {
       const cogsRow  = cogsMap.get(skuCode);
-      const cogs     = cogsRow ? safeNum(cogsRow['COGS']) : 0;
+      const cogs     = cogsRow && safeNum(cogsRow['COGS']) > 0 ? safeNum(cogsRow['COGS']) : 10;
       const brand    = cogsRow ? String(cogsRow['Brand'] || '') : '';
       map.set(key, {
         facilityName,
