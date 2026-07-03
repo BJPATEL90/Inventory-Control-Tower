@@ -533,6 +533,7 @@ function verifySheetStructure() {
     { name: SHEETS.SKU_SUMMARY,           columns: SKU_SUMMARY_COLUMNS },
     { name: SHEETS.SKU_AGG,              columns: SKU_AGG_COLUMNS },
     { name: SHEETS.DISCONTINUED,         columns: SKU_SUMMARY_COLUMNS },
+    { name: SHEETS.BAD_INVENTORY,        columns: BAD_INVENTORY_COLUMNS },
     { name: SHEETS.INVENTORY_HEALTH,      columns: INVENTORY_HEALTH_COLUMNS },
     { name: SHEETS.EXPIRY_SUMMARY,        columns: EXPIRY_SUMMARY_COLUMNS },
     { name: SHEETS.WAREHOUSE_UTILIZATION, columns: WAREHOUSE_UTILIZATION_COLUMNS },

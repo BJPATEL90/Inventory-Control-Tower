@@ -23,6 +23,7 @@ const SHEETS = {
   DASHBOARD_SUMMARY     : 'tbl_dashboard_summary',
   EMAIL_SUMMARY         : 'tbl_email_summary',
   SETTINGS              : 'tbl_settings',
+  BAD_INVENTORY         : 'tbl_bad_inventory',
 };
 
 // ---------------------------------------------------------------------------
@@ -109,8 +110,9 @@ const COGS_COLUMNS = [
 const FACILITY_MAPPING_COLUMNS = [
   'Depot Name',         // Matches Depot Name column in FG report and Facility column in Shelf report
   'Display_Name',       // Human-readable label shown in the dashboard
-  'Facility_Type',      // MW-3PL | MW-Self = Mother Warehouse; Darkstore | Self-B2B | etc. = Distribution
+  'Facility_Type',      // MW-Self = Mother WH; MW-3PL = 3PL; Darkstore = DS; etc.
   'Is Active',          // TRUE / FALSE
+  'F_Type',             // Short category tag: DS | WH | 3PL | B2B | etc. Used for bad inventory filter
 ];
 
 // Default seed data — will be written on first setup only.
@@ -200,6 +202,26 @@ const SKU_AGG_COLUMNS = [
   'Health Bucket',
   'Is Discontinued',
   'Active Facilities',
+];
+
+// ---------------------------------------------------------------------------
+// BAD INVENTORY — Facility-wise BAD_INVENTORY + QC_REJECTED stock
+// Excludes Darkstore (F_Type = 'DS') facilities.
+// ---------------------------------------------------------------------------
+const BAD_INVENTORY_COLUMNS = [
+  'Run Date',
+  'SKU Code',
+  'Product Name',
+  'Brand',
+  'Facility Code',
+  'Facility Name',
+  'Facility_Type',
+  'F_Type',
+  'BAD_INVENTORY Qty',
+  'QC_REJECTED Qty',
+  'Total Bad Qty',
+  'COGS',
+  'Bad Inventory Value',
 ];
 
 // ---------------------------------------------------------------------------

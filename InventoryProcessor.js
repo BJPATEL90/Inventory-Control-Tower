@@ -84,13 +84,20 @@ function runInventoryEngine() {
   Logger.log('Computing utilization...');
   const utilData = _computeBinUtilization(shelfRows, runDate);
 
-  // 10. Write outputs
+  // 10. Bad inventory summary (facility-wise, excludes DS)
+  Logger.log('Computing bad inventory...');
+  const badInvRows = _computeBadInventorySummary(shelfRows, cogsMap, facilityMap,
+                                                  mappedCodes, runDate);
+  Logger.log(`Bad inventory rows: ${badInvRows.length}`);
+
+  // 11. Write outputs
   Logger.log('Writing outputs...');
   _writeSkuSummary(skuRows);
   _writeDiscontinued(discontinuedRows);
   _writeSkuAgg(skuAggRows);
   _writeHealthSummary(healthRows);
   _writeExpirySummary(expiryRows);
+  _writeBadInventory(badInvRows);
   _writeUtilization(utilData);
   _writeDashboardSummary(skuAggRows, discontinuedRows, healthRows, utilData,
                           excludedFacilities, activeSKUs, runDate);
@@ -263,18 +270,12 @@ function _aggregateShelfData(shelfRows, today, mappedCodes, thresholds) {
       });
     }
 
-    // Good vs Bad — use Inventory Type from shelf report as primary classifier.
-    // GOOD_INVENTORY = saleable stock. BAD_INVENTORY = non-saleable.
-    // Near Expiry and Expired are always Bad regardless of Inventory Type.
-    const isGoodType = inventoryType === INVENTORY_TYPE_GOOD.toUpperCase();
-    const isBad      = !isGoodType || isExpired || isNearExpiry
-                       || qtyDamaged > 0 || qtyNotFound > 0
-                       || batchStatus !== BATCH_STATUS_ACTIVE;
-
-    if (isBad) {
-      agg.badQty += qty;
-    } else {
+    // Good vs Bad — classify purely by Inventory Type field from Unicommerce.
+    // GOOD_INVENTORY = saleable. BAD_INVENTORY | QC_REJECTED = bad/non-saleable.
+    if (inventoryType === 'GOOD_INVENTORY') {
       agg.goodQty += qty;
+    } else {
+      agg.badQty += qty;
     }
 
     agg.damagedQty += qtyDamaged;
@@ -698,7 +699,7 @@ function _computeBinUtilization(shelfRows, runDate) {
 
   const occupiedBins = new Set();
   shelfRows.forEach(row => {
-    if (String(row['Facility Code'] || '').trim() !== BIN_UTILIZATION_FACILITY) return;
+    if (String(row['Facility'] || '').trim() !== BIN_UTILIZATION_FACILITY) return;
     const shelf = String(row['Shelf'] || '').trim();
     if (shelf && safeNum(row['Quantity']) > 0) occupiedBins.add(shelf.toUpperCase());
   });
@@ -734,6 +735,81 @@ function _incAgg(map, key, isOccupied) {
   if (!map.has(key)) map.set(key, { total: 0, occupied: 0 });
   const d = map.get(key); d.total++;
   if (isOccupied) d.occupied++;
+}
+
+// ---------------------------------------------------------------------------
+// BAD INVENTORY SUMMARY — Facility-wise BAD_INVENTORY + QC_REJECTED
+// Excludes facilities where F_Type = 'DS' (Darkstores).
+// ---------------------------------------------------------------------------
+
+function _computeBadInventorySummary(shelfRows, cogsMap, facilityMap, mappedCodes, runDate) {
+  const map = new Map();
+
+  shelfRows.forEach(row => {
+    const facilityName = String(row['Facility'] || row['Facility Code'] || '').trim();
+    if (!mappedCodes.has(facilityName)) return;
+
+    const invType = String(row['Inventory Type'] || '').trim().toUpperCase();
+    if (invType !== 'BAD_INVENTORY' && invType !== 'QC_REJECTED') return;
+
+    const facInfo = facilityMap.get(facilityName);
+    if (!facInfo) return;
+
+    // Exclude Darkstore facilities
+    const fType = String(facInfo['F_Type'] || '').trim();
+    if (fType === 'DS') return;
+
+    const skuCode = String(row['Item Type SKU Code'] || '').trim();
+    if (!skuCode) return;
+
+    const qty = safeNum(row['Quantity']);
+    if (qty <= 0) return;
+
+    const key = `${facilityName}|${skuCode}`;
+    if (!map.has(key)) {
+      const cogsRow  = cogsMap.get(skuCode);
+      const cogs     = cogsRow ? safeNum(cogsRow['COGS']) : 0;
+      const brand    = cogsRow ? String(cogsRow['Brand'] || '') : '';
+      map.set(key, {
+        facilityName,
+        facDisplay : String(facInfo['Display_Name'] || facilityName),
+        facType    : String(facInfo['Facility_Type'] || ''),
+        fType,
+        skuCode,
+        name  : String(row['Item Type Name'] || ''),
+        brand,
+        cogs,
+        badQty : 0,
+        qcQty  : 0,
+      });
+    }
+
+    const e = map.get(key);
+    if (invType === 'BAD_INVENTORY') e.badQty += qty;
+    else                             e.qcQty  += qty;
+  });
+
+  const rows = [];
+  map.forEach(e => {
+    const totalBad = e.badQty + e.qcQty;
+    if (totalBad <= 0) return;
+    rows.push([
+      runDate,
+      e.skuCode, e.name, e.brand,
+      e.facilityName, e.facDisplay, e.facType, e.fType,
+      e.badQty, e.qcQty, totalBad,
+      e.cogs, totalBad * e.cogs,
+    ]);
+  });
+
+  rows.sort((a, b) => b[12] - a[12]); // Sort by bad value descending
+  return rows;
+}
+
+function _writeBadInventory(rows) {
+  clearSheetData(SHEETS.BAD_INVENTORY);
+  if (rows.length > 0) _batchWriteRows(SHEETS.BAD_INVENTORY, rows);
+  Logger.log(`Bad Inventory: ${rows.length} rows`);
 }
 
 // ---------------------------------------------------------------------------
