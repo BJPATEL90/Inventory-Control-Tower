@@ -101,6 +101,42 @@ function _ensureHeader(sheet, columns) {
 }
 
 /**
+ * Force-updates row 1 headers on all sheets to match current column definitions.
+ * Run this after adding or renaming columns in Config.gs.
+ * Safe: only touches row 1, never data rows.
+ */
+function fixAllHeaders() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheetDefs = [
+    { name: SHEETS.FG_INVENTORY_RAW,      columns: FG_COLUMNS },
+    { name: SHEETS.SHELF_INVENTORY_RAW,   columns: SHELF_COLUMNS },
+    { name: SHEETS.BIN_MASTER,            columns: BIN_COLUMNS },
+    { name: SHEETS.COGS_MASTER,           columns: COGS_COLUMNS },
+    { name: SHEETS.FACILITY_MAPPING,      columns: FACILITY_MAPPING_COLUMNS },
+    { name: SHEETS.SKU_SUMMARY,           columns: SKU_SUMMARY_COLUMNS },
+    { name: SHEETS.SKU_AGG,              columns: SKU_AGG_COLUMNS },
+    { name: SHEETS.DISCONTINUED,         columns: SKU_SUMMARY_COLUMNS },
+    { name: SHEETS.BAD_INVENTORY,        columns: BAD_INVENTORY_COLUMNS },
+    { name: SHEETS.INVENTORY_HEALTH,      columns: INVENTORY_HEALTH_COLUMNS },
+    { name: SHEETS.EXPIRY_SUMMARY,        columns: EXPIRY_SUMMARY_COLUMNS },
+    { name: SHEETS.WAREHOUSE_UTILIZATION, columns: WAREHOUSE_UTILIZATION_COLUMNS },
+    { name: SHEETS.DASHBOARD_SUMMARY,     columns: DASHBOARD_SUMMARY_COLUMNS },
+    { name: SHEETS.EMAIL_SUMMARY,         columns: EMAIL_SUMMARY_COLUMNS },
+    { name: SHEETS.SETTINGS,             columns: SETTINGS_COLUMNS },
+  ];
+
+  sheetDefs.forEach(def => {
+    const sheet = ss.getSheetByName(def.name);
+    if (!sheet) { Logger.log(`SKIP (not found): ${def.name}`); return; }
+    sheet.getRange(1, 1, 1, def.columns.length).setValues([def.columns]);
+    _formatHeaderRow(sheet);
+    Logger.log(`Headers updated: ${def.name} (${def.columns.length} cols)`);
+  });
+
+  Logger.log('fixAllHeaders complete.');
+}
+
+/**
  * Applies consistent enterprise header formatting.
  */
 function _formatHeaderRow(sheet) {
