@@ -408,31 +408,86 @@ function _renderSkuResult(area, d) {
 async function loadMotherWarehouse(container) {
   container.innerHTML = `
     <div class="page-header">
-      <div><div class="page-title">Mother Warehouse Control Tower</div>
-        <div class="page-subtitle">Live status and KPIs for all mother warehouses</div></div>
+      <div><div class="page-title">Warehouse Control Tower</div>
+        <div class="page-subtitle">Live status and KPIs across all warehouse types</div></div>
       <div class="page-actions">
         <button class="btn btn-secondary btn-sm" onclick="refreshMotherWarehouse()">🔄 Refresh</button>
       </div>
     </div>
-    <div class="mw-grid" id="mw-cards">
-      <div class="loading-state"><div class="loading-spinner"></div></div>
+
+    <!-- Mother Hub section -->
+    <div class="wct-section">
+      <div class="wct-section-header">
+        <span class="wct-section-title">Mother Hub</span>
+        <span class="wct-section-sub">MW-Self facilities</span>
+      </div>
+      <div class="mw-grid" id="mw-cards-mother">
+        <div class="loading-state"><div class="loading-spinner"></div></div>
+      </div>
+      <div class="table-wrap" style="margin-top:8px;">
+        <div class="table-scroll"><table>
+          <thead><tr>
+            <th>Facility</th><th class="td-right">SOH</th><th class="td-right">SIT</th>
+            <th class="td-right">Inv. Value</th><th class="td-right">Good Value</th>
+            <th class="td-right">Bad Value</th><th class="td-right">Sales 30D</th>
+            <th class="td-right">DOI 30</th><th class="td-right">DOI 7</th>
+            <th class="td-right">OOS</th><th class="td-right">Critical</th><th>Status</th>
+          </tr></thead>
+          <tbody id="mw-tbody-mother">
+            <tr><td colspan="12"><div class="loading-state"><div class="loading-spinner"></div></div></td></tr>
+          </tbody>
+        </table></div>
+      </div>
     </div>
 
-    <!-- Full comparison table -->
-    <div class="table-wrap">
-      <div class="table-header"><span class="table-title">Comparison Table</span></div>
-      <div class="table-scroll"><table>
-        <thead><tr>
-          <th>Facility</th><th class="td-right">SOH</th><th class="td-right">SIT</th>
-          <th class="td-right">Inv. Value</th><th class="td-right">Good Value</th>
-          <th class="td-right">Bad Value</th><th class="td-right">Sales 30D</th>
-          <th class="td-right">DOI 30</th><th class="td-right">DOI 7</th>
-          <th class="td-right">OOS SKUs</th><th class="td-right">Critical SKUs</th><th>Status</th>
-        </tr></thead>
-        <tbody id="mw-tbody">
-          <tr><td colspan="12"><div class="loading-state"><div class="loading-spinner"></div></div></td></tr>
-        </tbody>
-      </table></div>
+    <!-- Darkstore section -->
+    <div class="wct-section">
+      <div class="wct-section-header">
+        <span class="wct-section-title">DS — Darkstore</span>
+        <span class="wct-section-sub">DS facilities</span>
+      </div>
+      <div class="mw-grid" id="mw-cards-ds">
+        <div class="loading-state"><div class="loading-spinner"></div></div>
+      </div>
+      <div class="table-wrap" style="margin-top:8px;">
+        <div class="table-scroll"><table>
+          <thead><tr>
+            <th>Facility</th><th class="td-right">SOH</th><th class="td-right">SIT</th>
+            <th class="td-right">Inv. Value</th><th class="td-right">Good Value</th>
+            <th class="td-right">Bad Value</th><th class="td-right">Sales 30D</th>
+            <th class="td-right">DOI 30</th><th class="td-right">DOI 7</th>
+            <th class="td-right">OOS</th><th class="td-right">Critical</th><th>Status</th>
+          </tr></thead>
+          <tbody id="mw-tbody-ds">
+            <tr><td colspan="12"><div class="loading-state"><div class="loading-spinner"></div></div></td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- 3PL Warehouse section -->
+    <div class="wct-section">
+      <div class="wct-section-header">
+        <span class="wct-section-title">3PL Warehouse</span>
+        <span class="wct-section-sub">MW-3PL facilities</span>
+      </div>
+      <div class="mw-grid" id="mw-cards-3pl">
+        <div class="loading-state"><div class="loading-spinner"></div></div>
+      </div>
+      <div class="table-wrap" style="margin-top:8px;">
+        <div class="table-scroll"><table>
+          <thead><tr>
+            <th>Facility</th><th class="td-right">SOH</th><th class="td-right">SIT</th>
+            <th class="td-right">Inv. Value</th><th class="td-right">Good Value</th>
+            <th class="td-right">Bad Value</th><th class="td-right">Sales 30D</th>
+            <th class="td-right">DOI 30</th><th class="td-right">DOI 7</th>
+            <th class="td-right">OOS</th><th class="td-right">Critical</th><th>Status</th>
+          </tr></thead>
+          <tbody id="mw-tbody-3pl">
+            <tr><td colspan="12"><div class="loading-state"><div class="loading-spinner"></div></div></td></tr>
+          </tbody>
+        </table></div>
+      </div>
     </div>`;
 
   await _fetchMotherWarehouse();
@@ -441,67 +496,77 @@ async function loadMotherWarehouse(container) {
 async function _fetchMotherWarehouse() {
   try {
     const data = await API.getMotherWarehouse();
-    _renderMwCards(data.facilities);
-    _renderMwTable(data.facilities);
-  } catch(e) { showToast('Mother warehouse load failed: ' + e.message, 'error'); }
+    _renderMwSection('mother', data.motherHub    || data.facilities || [], 'badge-mother');
+    _renderMwSection('ds',     data.darkstores   || [],                    'badge-node');
+    _renderMwSection('3pl',    data.warehouses3pl|| [],                    'badge-3pl');
+  } catch(e) { showToast('Warehouse load failed: ' + e.message, 'error'); }
 }
 
-function _renderMwCards(facilities) {
-  const grid = document.getElementById('mw-cards');
-  if (!grid) return;
-  grid.innerHTML = facilities.map(f => {
-    const statusClass = `status-${f.status.toLowerCase()}`;
-    const statusIcon  = f.status === 'Green' ? '🟢' : f.status === 'Yellow' ? '🟡' : '🔴';
-    return `
-      <div class="mw-card ${statusClass}">
-        <div class="mw-card-header">
-          <div class="mw-card-name">${f.facilityName}</div>
-          <span class="badge badge-mother">${f.facilityCode}</span>
-        </div>
-        <div class="mw-card-body">
-          ${[
-            ['SOH',             formatNum(f.soh)],
-            ['SIT',             formatNum(f.sit)],
-            ['Inventory Value', formatINR(f.inventoryValue)],
-            ['Good Value',      formatINR(f.goodValue)],
-            ['Value At Risk',   formatINR(f.valueAtRisk)],
-            ['Sales 30D',       formatNum(f.sales30)],
-            ['DOI 30',          formatDOI(f.doi30)],
-            ['DOI 7',           formatDOI(f.doi7)],
-            ['OOS SKUs',        formatNum(f.oosSkus)],
-            ['Critical SKUs',   formatNum(f.criticalSkus)],
-          ].map(([l,v]) => `
-            <div class="mw-stat-row">
-              <span class="mw-stat-label">${l}</span>
-              <span class="mw-stat-value">${v}</span>
-            </div>`).join('')}
-          <div class="mw-stat-row" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
-            <span class="mw-stat-label">Status</span>
-            <span>${statusIcon} ${f.status}</span>
-          </div>
-        </div>
-      </div>`;
-  }).join('');
-}
+function _renderMwSection(key, facilities, badgeClass) {
+  const cardEl  = document.getElementById(`mw-cards-${key}`);
+  const tbodyEl = document.getElementById(`mw-tbody-${key}`);
 
-function _renderMwTable(facilities) {
-  const tbody = document.getElementById('mw-tbody');
-  if (!tbody) return;
-  tbody.innerHTML = facilities.map(f => `
-    <tr>
-      <td><strong>${f.facilityName}</strong><br><span class="td-mono">${f.facilityCode}</span></td>
-      <td class="td-right">${formatNum(f.soh)}</td>
-      <td class="td-right text-muted">${formatNum(f.sit)}</td>
-      <td class="td-right fw-600">${formatINR(f.inventoryValue)}</td>
-      <td class="td-right text-green">${formatINR(f.goodValue)}</td>
-      <td class="td-right text-red">${formatINR(f.badValue)}</td>
-      <td class="td-right">${formatNum(f.sales30)}</td>
-      <td class="td-right">${formatDOI(f.doi30)}</td>
-      <td class="td-right">${formatDOI(f.doi7)}</td>
-      <td class="td-right text-red">${formatNum(f.oosSkus)}</td>
-      <td class="td-right text-amber">${formatNum(f.criticalSkus)}</td>
-      <td><span class="badge badge-${f.status.toLowerCase() === 'green' ? 'green' : f.status.toLowerCase() === 'yellow' ? 'yellow' : 'red'}">${f.status}</span></td>
-    </tr>`).join('');
+  if (cardEl) {
+    if (facilities.length === 0) {
+      cardEl.innerHTML = `<div class="empty-state" style="padding:16px;"><p>No ${key === 'ds' ? 'Darkstore' : key === '3pl' ? '3PL' : 'Mother Hub'} facilities found.</p></div>`;
+    } else {
+      cardEl.innerHTML = facilities.map(f => {
+        const statusIcon = f.status === 'Green' ? '🟢' : f.status === 'Yellow' ? '🟡' : f.status === 'Red' ? '🔴' : '⚫';
+        return `
+          <div class="mw-card status-${(f.status || 'grey').toLowerCase()}">
+            <div class="mw-card-header">
+              <div class="mw-card-name">${f.facilityName}</div>
+              <span class="badge ${badgeClass}">${f.facilityCode}</span>
+            </div>
+            <div class="mw-card-body">
+              ${[
+                ['SOH',             formatNum(f.soh)],
+                ['SIT',             formatNum(f.sit)],
+                ['Inventory Value', formatINR(f.inventoryValue)],
+                ['Good Value',      formatINR(f.goodValue)],
+                ['Bad Value',       formatINR(f.badValue)],
+                ['Value At Risk',   formatINR(f.valueAtRisk)],
+                ['Sales 30D',       formatNum(f.sales30)],
+                ['DOI 30',          formatDOI(f.doi30)],
+                ['DOI 7',           formatDOI(f.doi7)],
+                ['OOS SKUs',        formatNum(f.oosSkus)],
+                ['Critical SKUs',   formatNum(f.criticalSkus)],
+              ].map(([l,v]) => `
+                <div class="mw-stat-row">
+                  <span class="mw-stat-label">${l}</span>
+                  <span class="mw-stat-value">${v}</span>
+                </div>`).join('')}
+              <div class="mw-stat-row" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
+                <span class="mw-stat-label">Status</span>
+                <span>${statusIcon} ${f.status}</span>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+  }
+
+  if (tbodyEl) {
+    if (facilities.length === 0) {
+      tbodyEl.innerHTML = `<tr><td colspan="12" class="text-muted" style="padding:12px;text-align:center;">No data</td></tr>`;
+    } else {
+      tbodyEl.innerHTML = facilities.map(f => `
+        <tr>
+          <td><strong>${f.facilityName}</strong><br><span class="td-mono" style="font-size:10px;">${f.facilityCode}</span></td>
+          <td class="td-right">${formatNum(f.soh)}</td>
+          <td class="td-right text-muted">${formatNum(f.sit)}</td>
+          <td class="td-right fw-600">${formatINR(f.inventoryValue)}</td>
+          <td class="td-right text-green">${formatINR(f.goodValue)}</td>
+          <td class="td-right text-red">${formatINR(f.badValue)}</td>
+          <td class="td-right">${formatNum(f.sales30)}</td>
+          <td class="td-right">${formatDOI(f.doi30)}</td>
+          <td class="td-right">${formatDOI(f.doi7)}</td>
+          <td class="td-right text-red">${formatNum(f.oosSkus)}</td>
+          <td class="td-right text-amber">${formatNum(f.criticalSkus)}</td>
+          <td><span class="badge badge-${(f.status||'').toLowerCase() === 'green' ? 'green' : (f.status||'').toLowerCase() === 'yellow' ? 'yellow' : (f.status||'').toLowerCase() === 'red' ? 'red' : 'grey'}">${f.status}</span></td>
+        </tr>`).join('');
+    }
+  }
 }
 
 window.refreshMotherWarehouse = function() { clearCacheFor('mother-warehouse'); _fetchMotherWarehouse(); };
