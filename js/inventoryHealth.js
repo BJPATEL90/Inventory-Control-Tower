@@ -4,11 +4,13 @@
 // =============================================================================
 
 let _healthState = {
-  data       : null,
-  page       : 1,
-  pageSize   : 200,
-  filters    : {},
-  sortData   : [],
+  data           : null,
+  page           : 1,
+  pageSize       : 200,
+  filters        : {},
+  sortData       : [],
+  allFacilities  : [],   // full list loaded once for type-based filtering
+  facilityType   : '',   // '', 'MW-Self', 'MW-3PL', 'DS'
 };
 
 async function loadInventoryHealth(container) {
@@ -34,6 +36,20 @@ async function loadInventoryHealth(container) {
         </div>`).join('')}
     </div>
 
+    <!-- Facility Type Toggle -->
+    <div class="filter-bar" id="health-type-bar" style="margin-bottom:6px;gap:8px;flex-wrap:wrap;">
+      <span class="filter-label">Facility Type</span>
+      ${[
+        ['', 'All Facilities'],
+        ['MW-Self', 'Mother Hub'],
+        ['MW-3PL', '3PL / Ambient'],
+        ['DS', 'Darkstore'],
+      ].map(([val, lbl]) => `
+        <button class="btn btn-sm ${val === '' ? 'btn-primary' : 'btn-secondary'}"
+                id="hft-${val || 'all'}"
+                onclick="setHealthFacilityType('${val}')">${lbl}</button>`).join('')}
+    </div>
+
     <!-- Filters -->
     <div class="filter-bar" id="health-filter-bar">
       <div class="filter-group">
@@ -43,7 +59,7 @@ async function loadInventoryHealth(container) {
       <div class="filter-group">
         <span class="filter-label">Facility</span>
         <select class="filter-select" id="hf-facility" onchange="applyHealthFilters()">
-          <option value="">All Facilities</option>
+          <option value="">All</option>
         </select>
       </div>
       <div class="filter-group">
@@ -163,10 +179,11 @@ window.debounceHealthFilter = function() {
 window.applyHealthFilters = function() {
   _healthState.page = 1;
   _healthState.filters = {
-    sku     : document.getElementById('hf-sku')?.value      || '',
-    facility: document.getElementById('hf-facility')?.value || '',
-    brand   : document.getElementById('hf-brand')?.value    || '',
-    bucket  : document.getElementById('hf-bucket')?.value   || '',
+    sku          : document.getElementById('hf-sku')?.value      || '',
+    facility     : document.getElementById('hf-facility')?.value || '',
+    brand        : document.getElementById('hf-brand')?.value    || '',
+    bucket       : document.getElementById('hf-bucket')?.value   || '',
+    facilityType : _healthState.facilityType || '',
   };
   _fetchHealth();
 };
@@ -186,6 +203,15 @@ window.clearHealthFilters = function() {
     if (el) el.value = '';
   });
   document.querySelectorAll('.bucket-card').forEach(c => c.classList.remove('selected'));
+  // Reset facility type toggle to "All"
+  _healthState.facilityType = '';
+  _rebuildFacilityDropdown('hf-facility', '');
+  ['', 'MW-Self', 'MW-3PL', 'DS'].forEach(v => {
+    const btn = document.getElementById('hft-' + (v || 'all'));
+    if (!btn) return;
+    btn.className = btn.className.replace(/btn-primary|btn-secondary/g, '').trim();
+    btn.className += ' ' + (v === '' ? 'btn-primary' : 'btn-secondary');
+  });
   _healthState.filters = {};
   _healthState.page    = 1;
   _fetchHealth();
@@ -214,12 +240,44 @@ window.exportHealthCSV = async function() {
 async function _populateFacilityDropdown(elId) {
   try {
     const facilities = await API.getFacilities();
-    const sel = document.getElementById(elId);
-    if (!sel) return;
-    facilities.forEach(f => {
-      const opt = document.createElement('option');
-      opt.value = f.code; opt.textContent = `${f.code} — ${f.name}`;
-      sel.appendChild(opt);
-    });
+    _healthState.allFacilities = facilities;
+    _rebuildFacilityDropdown(elId, '');
   } catch (e) { /* non-critical */ }
 }
+
+function _rebuildFacilityDropdown(elId, typeFilter) {
+  const sel = document.getElementById(elId);
+  if (!sel) return;
+  const list = typeFilter
+    ? _healthState.allFacilities.filter(f => f.type === typeFilter)
+    : _healthState.allFacilities;
+  // Keep selected value if still in filtered list
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">All</option>';
+  list.forEach(f => {
+    const opt = document.createElement('option');
+    opt.value = f.code; opt.textContent = `${f.code} — ${f.name}`;
+    sel.appendChild(opt);
+  });
+  if (list.some(f => f.code === prev)) sel.value = prev;
+}
+
+window.setHealthFacilityType = function(typeVal) {
+  _healthState.facilityType = typeVal;
+  // Update toggle button styles
+  ['', 'MW-Self', 'MW-3PL', 'DS'].forEach(v => {
+    const btn = document.getElementById('hft-' + (v || 'all'));
+    if (!btn) return;
+    btn.className = btn.className.replace(/btn-primary|btn-secondary/g, '').trim();
+    btn.className += ' ' + (v === typeVal ? 'btn-primary' : 'btn-secondary');
+  });
+  // Reset facility dropdown to match selected type
+  const sel = document.getElementById('hf-facility');
+  if (sel) sel.value = '';
+  _rebuildFacilityDropdown('hf-facility', typeVal);
+  // Re-fetch with type filter (facility filter reset)
+  _healthState.filters.facilityType = typeVal;
+  _healthState.filters.facility = '';
+  _healthState.page = 1;
+  _fetchHealth();
+};

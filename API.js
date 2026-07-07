@@ -244,13 +244,20 @@ function _buildSummaryCharts(skuAggRows, skuRows) {
  * Builds 30-day trend data from dashboard summary history.
  */
 function _buildTrendData(summaryRows) {
-  const last30 = summaryRows.slice(-30);
+  // Deduplicate by date — keep the last (latest) row per date.
+  // Multiple manualRun() calls on the same day append multiple rows, causing zigzag spikes.
+  const byDate = new Map();
+  summaryRows.forEach(row => {
+    const d = _formatDate(row['Run Date']);
+    if (d) byDate.set(d, row);
+  });
+  const last30 = Array.from(byDate.values()).slice(-30);
   return last30.map(row => ({
-    date              : _formatDate(row['Run Date']),
-    totalValue        : safeNum(row['Total Inventory Value']),
-    valueAtRisk       : safeNum(row['Value At Risk']),
-    oosCount          : safeNum(row['OOS SKU Count']),
-    utilizationPct    : safeNum(row['Warehouse Utilization Pct']),
+    date           : _formatDate(row['Run Date']),
+    totalValue     : safeNum(row['Total Inventory Value']),
+    valueAtRisk    : safeNum(row['Value At Risk']),
+    oosCount       : safeNum(row['OOS SKU Count']),
+    utilizationPct : safeNum(row['Warehouse Utilization Pct']),
   }));
 }
 
@@ -277,12 +284,13 @@ function _buildTrendData(summaryRows) {
  * Bucket summary always comes from tbl_sku_agg (distinct SKU counts, not inflated).
  */
 function apiGetInventoryHealth(params) {
-  const facilityFilter = (params.facility || '').trim().toUpperCase();
-  const brandFilter    = (params.brand    || '').trim().toLowerCase();
-  const bucketFilter   = (params.bucket   || '').trim();
-  const skuFilter      = (params.sku      || '').trim().toLowerCase();
-  const page           = Math.max(1, parseInt(params.page     || '1',    10));
-  const pageSize       = Math.min(500, parseInt(params.pageSize || '200', 10));
+  const facilityFilter     = (params.facility     || '').trim().toUpperCase();
+  const facilityTypeFilter = (params.facilityType || '').trim();
+  const brandFilter        = (params.brand        || '').trim().toLowerCase();
+  const bucketFilter       = (params.bucket       || '').trim();
+  const skuFilter          = (params.sku          || '').trim().toLowerCase();
+  const page               = Math.max(1, parseInt(params.page     || '1',    10));
+  const pageSize           = Math.min(500, parseInt(params.pageSize || '200', 10));
 
   // Bucket summary always from tbl_sku_agg (1 row per SKU = correct distinct counts)
   const skuAggRows = readSheetAsObjects(SHEETS.SKU_AGG);
@@ -298,14 +306,15 @@ function apiGetInventoryHealth(params) {
   });
   const bucketSummary = Object.entries(bucketTotals).map(([bucket, d]) => ({ bucket, ...d }));
 
-  const viewMode = facilityFilter ? 'facility' : 'sku';
+  const viewMode = (facilityFilter || facilityTypeFilter) ? 'facility' : 'sku';
 
   let rows, detail;
 
   if (viewMode === 'facility') {
-    // Facility drill-down: read tbl_sku_summary filtered to the selected facility
-    rows = readSheetAsObjects(SHEETS.SKU_SUMMARY)
-      .filter(r => String(r['Facility Code'] || '').toUpperCase() === facilityFilter);
+    // Facility drill-down: read tbl_sku_summary filtered to the selected facility/type
+    rows = readSheetAsObjects(SHEETS.SKU_SUMMARY);
+    if (facilityFilter)     rows = rows.filter(r => String(r['Facility Code'] || '').toUpperCase() === facilityFilter);
+    if (facilityTypeFilter) rows = rows.filter(r => String(r['Facility Type'] || '') === facilityTypeFilter);
 
     if (brandFilter)  rows = rows.filter(r => String(r['Brand']        || '').toLowerCase().includes(brandFilter));
     if (bucketFilter) rows = rows.filter(r => String(r['Health Bucket']|| '') === bucketFilter);
