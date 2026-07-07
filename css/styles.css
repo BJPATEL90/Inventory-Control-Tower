@@ -833,21 +833,21 @@ tbody td {
   text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 12px;
 }
 .heatmap-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
-.heatmap-lbl {
+.heatmap-lbl, .heatmap-label {
   font-size: 10px; color: var(--text-3);
   width: 36px; text-align: right;
   font-family: var(--font-mono); flex-shrink: 0;
 }
-.heatmap-bar-bg {
+.heatmap-bar-bg, .heatmap-bar-wrap {
   flex: 1; height: 16px; background: var(--bg-2);
   border-radius: 3px; overflow: hidden;
 }
-.heatmap-bar-fill {
+.heatmap-bar-fill, .heatmap-bar {
   height: 100%;
   background: linear-gradient(90deg, var(--teal-700), var(--green-500));
   border-radius: 3px; transition: width 0.6s ease;
 }
-.heatmap-bar-fill.high {
+.heatmap-bar-fill.high, .heatmap-bar.high {
   background: linear-gradient(90deg, var(--c-amber), var(--c-red));
 }
 .heatmap-pct {
@@ -885,6 +885,13 @@ tbody td {
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 14px; margin-bottom: 20px;
 }
+/* Mother warehouse cards — vertical stack, one per row */
+.mw-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 20px;
+}
 .mw-card {
   background: var(--bg-1); border: 1px solid var(--border);
   border-radius: var(--radius-md); overflow: hidden;
@@ -901,7 +908,12 @@ tbody td {
   border-bottom: 1px solid var(--border-2);
 }
 .mw-card-name { font-size: 14px; font-weight: 700; color: var(--text-1); }
-.mw-card-body { padding: 12px 16px; }
+.mw-card-body {
+  padding: 12px 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0 24px;
+}
 .mw-stat-row {
   display: flex; justify-content: space-between; align-items: center;
   padding: 4px 0;
