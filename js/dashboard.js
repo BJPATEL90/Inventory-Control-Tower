@@ -9,11 +9,19 @@ let _overviewCharts = {};
 function _destroyAllCharts() {
   Object.values(_overviewCharts).forEach(c => { try { c.destroy(); } catch(e) {} });
   _overviewCharts = {};
-  // Also destroy any Chart.js instances attached to canvases globally
-  document.querySelectorAll('canvas').forEach(canvas => {
-    const existing = Chart.getChart(canvas);
-    if (existing) existing.destroy();
+  // Destroy any remaining Chart.js instances still tracked globally
+  Object.keys(Chart.instances || {}).forEach(id => {
+    try { Chart.instances[id].destroy(); } catch(e) {}
   });
+}
+
+// Safe canvas helper — destroys any existing Chart on the element before use
+function _getCanvas(id) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return null;
+  const existing = Chart.getChart(canvas);
+  if (existing) existing.destroy();
+  return canvas;
 }
 
 async function loadOverview(container) {
@@ -37,10 +45,15 @@ async function loadOverview(container) {
 
     <!-- Charts -->
     <div class="chart-grid" id="overview-charts">
-      ${['Inventory Value by Facility','Value by Brand (Top 15)','Inventory by Health Bucket','Mother Warehouse Comparison'].map(t => `
+      ${[
+        ['Inventory by Mother Hub',      'chart-mother-hub'],
+        ['Value by Brand (Top 15)',      'chart-brand'],
+        ['Inventory by Health Bucket',   'chart-bucket'],
+        ['Mother Warehouse Comparison',  'chart-mother-compare'],
+      ].map(([t, id]) => `
         <div class="chart-card">
           <div class="chart-card-title">${t}</div>
-          <canvas></canvas>
+          <canvas id="${id}"></canvas>
         </div>`).join('')}
     </div>
 
@@ -122,31 +135,37 @@ function _renderKpis(k) {
 // ---------------------------------------------------------------------------
 
 function _renderCharts(charts) {
-  const canvases = document.querySelectorAll('#overview-charts canvas');
-  if (!charts || canvases.length < 4) return;
+  if (!charts) return;
 
-  // Chart 1: Inventory Value by Facility (horizontal bar)
-  _overviewCharts.facility = new Chart(canvases[0], {
-    type: 'bar',
-    data: {
-      labels  : charts.byFacility.map(f => f.facility),
-      datasets: [
-        { label: 'Good',  data: charts.byFacility.map(f => f.goodValue), backgroundColor: CHART_COLORS.green,  borderRadius: 3 },
-        { label: 'Bad',   data: charts.byFacility.map(f => f.badValue),  backgroundColor: CHART_COLORS.red,    borderRadius: 3 },
-      ],
-    },
-    options: {
-      indexAxis: 'y', responsive: true, maintainAspectRatio: true,
-      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } } },
-      scales: {
-        x: { stacked: true, ticks: { callback: v => formatINR(v) } },
-        y: { stacked: true },
+  const motherData = charts.byMotherHub || charts.byMotherWarehouse || [];
+
+  // Chart 1: Inventory by Mother Hub (horizontal stacked bar — good/bad split)
+  const c1 = _getCanvas('chart-mother-hub');
+  if (c1) {
+    _overviewCharts.motherHub = new Chart(c1, {
+      type: 'bar',
+      data: {
+        labels  : motherData.map(f => f.facility),
+        datasets: [
+          { label: 'Good', data: motherData.map(f => f.goodValue || 0), backgroundColor: CHART_COLORS.green, borderRadius: 3 },
+          { label: 'Bad',  data: motherData.map(f => f.badValue  || 0), backgroundColor: CHART_COLORS.red,   borderRadius: 3 },
+        ],
       },
-    },
-  });
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: true,
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } } },
+        scales: {
+          x: { stacked: true, ticks: { callback: v => formatINR(v) } },
+          y: { stacked: true },
+        },
+      },
+    });
+  }
 
   // Chart 2: By Brand (doughnut)
-  _overviewCharts.brand = new Chart(canvases[1], {
+  const c2 = _getCanvas('chart-brand');
+  if (!c2) return;
+  _overviewCharts.brand = new Chart(c2, {
     type: 'doughnut',
     data: {
       labels  : charts.byBrand.map(b => b.brand),
@@ -166,50 +185,56 @@ function _renderCharts(charts) {
     'OOS': CHART_COLORS.red, 'Critical': CHART_COLORS.amber,
     'Risk': CHART_COLORS.yellow, 'Healthy': CHART_COLORS.green, 'Overstock': CHART_COLORS.blue,
   };
-  _overviewCharts.bucket = new Chart(canvases[2], {
-    type: 'bar',
-    data: {
-      labels  : charts.byBucket.map(b => b.bucket),
-      datasets: [
-        { label: 'SKU Count', data: charts.byBucket.map(b => b.skuCount),
-          backgroundColor: charts.byBucket.map(b => bucketColors[b.bucket] || CHART_COLORS.blue),
-          borderRadius: 4, yAxisID: 'y' },
-        { label: 'Value', data: charts.byBucket.map(b => b.value),
-          type: 'line', borderColor: CHART_COLORS.amber, backgroundColor: 'transparent',
-          pointRadius: 4, tension: 0.3, yAxisID: 'y2' },
-      ],
-    },
-    options: {
-      responsive: true, maintainAspectRatio: true,
-      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } } },
-      scales: {
-        y  : { position: 'left',  title: { display: true, text: 'SKUs' } },
-        y2 : { position: 'right', title: { display: true, text: 'Value' },
-               ticks: { callback: v => formatINR(v) }, grid: { drawOnChartArea: false } },
+  const c3 = _getCanvas('chart-bucket');
+  if (c3) {
+    _overviewCharts.bucket = new Chart(c3, {
+      type: 'bar',
+      data: {
+        labels  : charts.byBucket.map(b => b.bucket),
+        datasets: [
+          { label: 'SKU Count', data: charts.byBucket.map(b => b.skuCount),
+            backgroundColor: charts.byBucket.map(b => bucketColors[b.bucket] || CHART_COLORS.blue),
+            borderRadius: 4, yAxisID: 'y' },
+          { label: 'Value', data: charts.byBucket.map(b => b.value),
+            type: 'line', borderColor: CHART_COLORS.amber, backgroundColor: 'transparent',
+            pointRadius: 4, tension: 0.3, yAxisID: 'y2' },
+        ],
       },
-    },
-  });
+      options: {
+        responsive: true, maintainAspectRatio: true,
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } } },
+        scales: {
+          y  : { position: 'left',  title: { display: true, text: 'SKUs' } },
+          y2 : { position: 'right', title: { display: true, text: 'Value' },
+                 ticks: { callback: v => formatINR(v) }, grid: { drawOnChartArea: false } },
+        },
+      },
+    });
+  }
 
-  // Chart 4: Mother Warehouse comparison (bar)
-  _overviewCharts.mother = new Chart(canvases[3], {
-    type: 'bar',
-    data: {
-      labels  : charts.byMotherWarehouse.map(m => m.facility),
-      datasets: [{ label: 'Inventory Value', data: charts.byMotherWarehouse.map(m => m.value),
-        backgroundColor: [CHART_COLORS.blue, CHART_COLORS.purple, CHART_COLORS.teal],
-        borderRadius: 5 }],
-    },
-    options: {
-      responsive: true, maintainAspectRatio: true,
-      plugins: { legend: { display: false } },
-      scales: { y: { ticks: { callback: v => formatINR(v) } } },
-    },
-  });
+  // Chart 4: Mother Warehouse total value comparison (bar)
+  const c4 = _getCanvas('chart-mother-compare');
+  if (c4) {
+    _overviewCharts.mother = new Chart(c4, {
+      type: 'bar',
+      data: {
+        labels  : motherData.map(m => m.facility),
+        datasets: [{ label: 'Inventory Value', data: motherData.map(m => m.value),
+          backgroundColor: [CHART_COLORS.blue, CHART_COLORS.purple, CHART_COLORS.teal, CHART_COLORS.green, CHART_COLORS.amber],
+          borderRadius: 5 }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: true,
+        plugins: { legend: { display: false } },
+        scales: { y: { ticks: { callback: v => formatINR(v) } } },
+      },
+    });
+  }
 }
 
 function _renderTrend(trend) {
   if (!trend || trend.length === 0) return;
-  const canvas = document.getElementById('trend-chart');
+  const canvas = _getCanvas('trend-chart');
   if (!canvas) return;
 
   _overviewCharts.trend = new Chart(canvas, {

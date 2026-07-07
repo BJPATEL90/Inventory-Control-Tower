@@ -208,8 +208,11 @@ function _buildSummaryCharts(skuAggRows, skuRows) {
     }
 
     if (_isMotherwh(facilityType) && value > 0) {
-      if (!byMother.has(facility)) byMother.set(facility, 0);
-      byMother.set(facility, byMother.get(facility) + value);
+      if (!byMother.has(facility)) byMother.set(facility, { value: 0, goodValue: 0, badValue: 0 });
+      const mAgg = byMother.get(facility);
+      mAgg.value     += value;
+      mAgg.goodValue += goodVal;
+      mAgg.badValue  += badVal;
     }
   });
 
@@ -222,18 +225,18 @@ function _buildSummaryCharts(skuAggRows, skuRows) {
     HEALTH_BUCKET.RISK, HEALTH_BUCKET.HEALTHY, HEALTH_BUCKET.OVERSTOCK,
   ];
 
+  const motherSorted = Array.from(byMother.entries())
+    .map(([facility, d]) => ({ facility, value: d.value, goodValue: d.goodValue, badValue: d.badValue }))
+    .sort((a, b) => b.value - a.value);
+
   return {
-    byFacility: Array.from(byFacility.entries())
-      .map(([code, d]) => ({ facility: code, value: d.value, goodValue: d.goodValue, badValue: d.badValue }))
-      .sort((a, b) => b.value - a.value),
+    byMotherHub: motherSorted,       // Chart 1: Mother Hub good/bad breakdown
     byBrand: brandsSorted.map(([brand, value]) => ({ brand, value })),
     byBucket: bucketOrder.map(b => {
       const d = byBucket.get(b) || { skuCount: 0, qty: 0, value: 0 };
       return { bucket: b, skuCount: d.skuCount, qty: d.qty, value: d.value };
     }),
-    byMotherWarehouse: Array.from(byMother.entries())
-      .map(([facility, value]) => ({ facility, value }))
-      .sort((a, b) => b.value - a.value),
+    byMotherWarehouse: motherSorted, // Chart 4: kept for backward compat
   };
 }
 
