@@ -46,10 +46,10 @@ async function loadOverview(container) {
     <!-- Charts -->
     <div class="chart-grid" id="overview-charts">
       ${[
-        ['Inventory by Mother Hub',      'chart-mother-hub'],
-        ['Value by Brand (Top 15)',      'chart-brand'],
-        ['Inventory by Health Bucket',   'chart-bucket'],
-        ['Mother Warehouse Comparison',  'chart-mother-compare'],
+        ['Mother Hub — Good vs Bad Value', 'chart-mother-hub'],
+        ['Value by Brand (Top 15)',        'chart-brand'],
+        ['Inventory by Health Bucket',     'chart-bucket'],
+        ['Mother Hub Facility Comparison', 'chart-mother-compare'],
       ].map(([t, id]) => `
         <div class="chart-card">
           <div class="chart-card-title">${t}</div>

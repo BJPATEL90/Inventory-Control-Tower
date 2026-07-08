@@ -68,7 +68,7 @@ const MODULES = {
   expiry           : { label: 'Expiry Management',   icon: '⏳', loader: loadExpiry },
   utilization      : { label: 'Warehouse',           icon: '🏭', loader: loadUtilization },
   sku              : { label: 'SKU Deep Dive',       icon: '🔍', loader: loadSkuDeepDive },
-  'mother-warehouse': { label: 'Mother Warehouse',   icon: '🏗️', loader: loadMotherWarehouse },
+  'mother-warehouse': { label: 'Warehouse CT',        icon: '🏗️', loader: loadMotherWarehouse },
   settings         : { label: 'Settings',            icon: '⚙️', loader: loadSettings },
 };
 
