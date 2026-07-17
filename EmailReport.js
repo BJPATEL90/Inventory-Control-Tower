@@ -74,16 +74,19 @@ function _buildEmailPayload() {
   const skuRows = readSheetAsObjects(SHEETS.SKU_SUMMARY);
 
   // Aggregate totals by facility type
+  function _facType(r) {
+    return String(r['Facility Type'] || r['Facility_Type'] || '');
+  }
   function _aggByType(typeValue) {
-    const rows = skuRows.filter(r => String(r['Facility Type'] || '') === typeValue);
+    const rows = skuRows.filter(r => _facType(r) === typeValue);
     const agg  = { inventoryValue: 0, goodValue: 0, badValue: 0, valueAtRisk: 0,
                    soh: 0, oosSkus: 0, criticalSkus: 0, healthySkus: 0, overstockSkus: 0 };
     rows.forEach(r => {
-      agg.inventoryValue += safeNum(r['Inventory Value']);
-      agg.goodValue      += safeNum(r['Good Inventory Value']);
-      agg.badValue       += safeNum(r['Bad Inventory Value']);
-      agg.valueAtRisk    += safeNum(r['Value At Risk']);
-      agg.soh            += safeNum(r['SOH']);
+      agg.inventoryValue += safeNum(r['Inventory Value']      || r['Inv Value']  || 0);
+      agg.goodValue      += safeNum(r['Good Inventory Value'] || r['Good Value'] || 0);
+      agg.badValue       += safeNum(r['Bad Inventory Value']  || r['Bad Value']  || 0);
+      agg.valueAtRisk    += safeNum(r['Value At Risk']        || r['Risk Value'] || 0);
+      agg.soh            += safeNum(r['SOH'] || 0);
       const b = r['Health Bucket'];
       if (b === HEALTH_BUCKET.OOS)       agg.oosSkus++;
       if (b === HEALTH_BUCKET.CRITICAL)  agg.criticalSkus++;
@@ -101,7 +104,7 @@ function _buildEmailPayload() {
 
   // Per-facility breakdown for Mother Hub sub-facilities
   const motherFacMap = new Map();
-  skuRows.filter(r => _isMotherwh(r['Facility Type'])).forEach(r => {
+  skuRows.filter(r => _isMotherwh(_facType(r))).forEach(r => {
     const code = String(r['Facility Code'] || r['Depot Code'] || r['Depot Name'] || '');
     const name = String(r['Facility Name'] || r['Display_Name'] || code);
     if (!code) return;
